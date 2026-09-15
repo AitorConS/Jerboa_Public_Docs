@@ -11,7 +11,7 @@ Every error on this page is real: either Jerboa prints it, or the Nanos guest
 prints it on the serial console. Errors are grouped by *when* they happen —
 during the build, at boot inside the guest, at run time, or on Windows/WSL.
 If a concept below is unfamiliar (one-process model, packages, program path),
-read [Build Concepts](/docs/build-concepts/) first.
+read [Build Concepts](/build-concepts/) first.
 
 `jerboa build` runs **preflight checks** that catch many of the boot-time
 errors before the image exists, and `jerboa logs` / `jerboa run --attach`
@@ -361,5 +361,5 @@ or enable nested virtualization for WSL2.
 - `jerboa build . --name app --smoke` boots the image once right after
   building and reports known failure signatures automatically.
 - `jerboa inspect <id>` dumps the full VM state as JSON.
-- [Build Concepts](/docs/build-concepts/) explains the model behind
+- [Build Concepts](/build-concepts/) explains the model behind
   most of these errors.

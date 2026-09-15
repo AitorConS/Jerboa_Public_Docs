@@ -85,7 +85,7 @@ Notes:
   WSL2's default NAT networking it is reachable at the distro IP (the host from
   `jerboa daemon status`), not at `localhost` on the Windows host — set
   `networkingMode=mirrored` in `%USERPROFILE%\.wslconfig` for Docker-Desktop-style
-  `localhost` publishing. See [Getting Started](/docs/getting-started/).
+  `localhost` publishing. See [Getting Started](/getting-started/).
 
 ### `jerboa ps`
 
@@ -107,7 +107,7 @@ When the output contains a known Nanos failure signature (`popen failure`,
 `error loading shared library`, `no space left on device`, …), an explanation
 of the cause and the fix is printed after the logs. The same detection runs on
 `jerboa run --attach` output. See
-[Troubleshooting](/docs/troubleshooting/) for the full catalogue.
+[Troubleshooting](/troubleshooting/) for the full catalogue.
 
 ### `jerboa inspect <id>`
 
@@ -196,7 +196,7 @@ linked, its interpreter and the full recursive `DT_NEEDED` shared-library
 closure must resolve against the image contents; node/python entrypoints must
 be among the packed files. Errors abort the build with a fix hint;
 `--no-preflight` skips the checks. See
-[Build Concepts](/docs/build-concepts/) for the background.
+[Build Concepts](/build-concepts/) for the background.
 
 `[env]` keys are baked into the image environment (highest priority — they
 override env supplied by packages or the language driver).
@@ -569,7 +569,7 @@ The daemon runs as `root` inside the dedicated distro. The client persists rende
 
 Observability and store flags (`--metrics-addr`, `--ui-addr`, `--trace-addr`,
 `--log-format`, `--vm-log-max-bytes`, `--vm-store`) are covered in more detail in
-[Observability](/docs/observability/).
+[Observability](/observability/).
 
 ---
 

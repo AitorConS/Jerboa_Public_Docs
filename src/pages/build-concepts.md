@@ -9,7 +9,7 @@ source: "build-concepts.md"
 
 This page explains everything that happens when you run `jerboa build`, from
 first principles. It assumes no prior knowledge of unikernels. If a build or a
-boot fails, check [Troubleshooting](/docs/troubleshooting/) for the
+boot fails, check [Troubleshooting](/troubleshooting/) for the
 exact error message.
 
 
@@ -338,6 +338,6 @@ lang = "node"
 
 ## Next
 
-- [Troubleshooting](/docs/troubleshooting/) — common errors, decoded
-- [Getting Started](/docs/getting-started/)
-- [CLI Reference](/docs/cli-reference/)
+- [Troubleshooting](/troubleshooting/) — common errors, decoded
+- [Getting Started](/getting-started/)
+- [CLI Reference](/cli-reference/)

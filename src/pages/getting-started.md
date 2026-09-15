@@ -133,7 +133,7 @@ The Windows client auto-starts the daemon for daemon-backed commands when needed
 ## Build An Image
 
 `jerboa build` requires a reachable daemon. If unikernels are new to you, read
-[Build Concepts](/docs/build-concepts/) first — it explains the
+[Build Concepts](/build-concepts/) first — it explains the
 one-process model, packages, and everything `unikernel.toml` can do.
 
 ### Scaffold a project
@@ -192,7 +192,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o hello ./examples/hello
 jerboa build ./hello --name hello
 ```
 
-If a build or a boot fails, check [Troubleshooting](/docs/troubleshooting/)
+If a build or a boot fails, check [Troubleshooting](/troubleshooting/)
 — it decodes every common error message.
 
 ---
@@ -291,7 +291,7 @@ How it works:
 - names the daemon does not own are forwarded to an upstream resolver, so
   ordinary internet lookups still work
 - the same mechanism powers `compose` — services connect to each other by
-  service name (see [Compose](/docs/compose/))
+  service name (see [Compose](/compose/))
 
 Inspect the records the resolver would return:
 
@@ -318,7 +318,7 @@ jerboa volume create pgdata --size 1G --seed-pkg eyberg/postgresql:11.3.0 --src 
 jerboa run postgresql -v pgdata:/db --network pgnet -p 5432:5432
 ```
 
-See [Build Concepts → Volumes And Seeding](/docs/build-concepts/) for
+See [Build Concepts → Volumes And Seeding](/build-concepts/) for
 why seeding is needed.
 
 ---
@@ -339,7 +339,7 @@ jerboa compose down stack.yaml --volumes
 ## Updating
 
 Update CLI and daemon together for 0.51.2: this release uses wire protocol 2.
-Before upgrading existing Compose stacks, follow the [stack migration instructions](/docs/compose/#upgrading-existing-stacks).
+Before upgrading existing Compose stacks, follow the [stack migration instructions](/compose/#upgrading-existing-stacks).
 
 The CLI has no self-update command. How you update depends on the platform:
 
@@ -362,9 +362,9 @@ jerboa kernel update    # install the latest kernel toolchain
 
 ## Next
 
-- [Build Concepts](/docs/build-concepts/)
-- [CLI Reference](/docs/cli-reference/)
-- [Compose](/docs/compose/)
-- [Architecture](/docs/architecture/)
-- [Observability](/docs/observability/)
-- [Troubleshooting](/docs/troubleshooting/)
+- [Build Concepts](/build-concepts/)
+- [CLI Reference](/cli-reference/)
+- [Compose](/compose/)
+- [Architecture](/architecture/)
+- [Observability](/observability/)
+- [Troubleshooting](/troubleshooting/)
