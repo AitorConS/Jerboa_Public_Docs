@@ -1,0 +1,14 @@
+---
+// A terminal-style code block with a copy button.
+// Pass the visible label via `label`; the code goes in the default slot
+// as raw text (may contain <span class="d|f|c"> highlight spans).
+export interface Props { label: string; }
+const { label } = Astro.props;
+---
+<div class="cb" data-code>
+  <div class="cb-head">
+    <span>{label}</span>
+    <button class="code-copy" type="button">copy</button>
+  </div>
+  <pre><code><slot /></code></pre>
+</div>

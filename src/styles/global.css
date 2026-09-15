@@ -1,0 +1,116 @@
+:root {
+  --ink: #2a2118;
+  --sand: #efe7d8;
+  --surface: #f8f3ea;
+  --muted: #6f6151;
+  --accent: #a35b3a;
+  --border: rgba(42, 33, 24, 0.12);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Ship the page pre-zoomed — reads best around 125%. `zoom` scales layout like
+   the browser's own zoom (now standard: Chrome, Safari, Firefox 126+), so
+   px-based sizing stays proportional and reflows normally.
+   NB: no `scroll-behavior: smooth` here on purpose — a smooth scroll animation
+   fights the View Transitions (ClientRouter) scroll reset and aborts it. */
+html { zoom: 1.25; }
+
+body {
+  margin: 0;
+  background: var(--sand);
+  color: var(--ink);
+  font-family: 'Geist', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: rgba(163, 91, 58, 0.22); }
+
+a { text-decoration: none; color: inherit; }
+
+.jb-link { transition: color .15s ease, opacity .15s ease; }
+.jb-link:hover { color: var(--accent); }
+.jb-link.is-active { color: var(--accent); font-weight: 500; }
+
+.jb-btn { transition: transform .15s ease, background .15s ease, border-color .15s ease, color .15s ease; }
+.jb-btn:hover { transform: translateY(-1px); }
+
+.jb-card { transition: transform .2s ease, border-color .2s ease; }
+.jb-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+
+/* ===== layout helpers ===== */
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+
+.site-header {
+  position: sticky; top: 0; z-index: 30;
+  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--sand) 82%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+.site-nav { height: 64px; display: flex; align-items: center; gap: 30px; }
+.brand { display: flex; align-items: center; gap: 11px; }
+.brand-mark { width: 42px; height: 42px; object-fit: contain; display: inline-block; }
+.brand-name { font-family: 'Newsreader', serif; font-size: 23px; letter-spacing: -.01em; }
+.nav-menu { display: flex; align-items: center; gap: 24px; flex: 1; }
+.nav-links { display: flex; align-items: center; gap: 24px; font-size: 14.5px; color: var(--muted); }
+.nav-gh { margin-left: auto; }
+.spacer { flex: 1; }
+
+/* Hamburger — hidden on desktop, shown on mobile. */
+.nav-burger { display: none; margin-left: auto; flex-direction: column; justify-content: center; gap: 5px; width: 40px; height: 40px; cursor: pointer; }
+.nav-burger span { display: block; width: 22px; height: 2px; background: var(--ink); border-radius: 2px; transition: transform .2s ease, opacity .2s ease; }
+
+/* ===== footer ===== */
+.site-footer { border-top: 1px solid var(--border); }
+.footer-row { padding: 38px 28px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; max-width: 1180px; margin: 0 auto; }
+.footer-links { display: flex; gap: 24px; font-size: 14px; color: var(--muted); }
+
+/* ===== code blocks ===== */
+.cb { border: 1px solid rgba(233,220,199,.14); border-radius: 11px; overflow: hidden; margin: 16px 0; background: #231d16; max-width: 720px; }
+.cb-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid rgba(233,220,199,.1); }
+.cb-head > span { font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: #9c8b73; }
+.code-copy { background: none; border: none; color: #9c8b73; cursor: pointer; font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .04em; transition: color .15s; }
+.code-copy:hover { color: #ecdfca; }
+.cb pre { margin: 0; padding: 15px 18px; overflow-x: auto; font-family: 'Geist Mono', monospace; font-size: 13.5px; line-height: 1.92; color: #e9dcc7; }
+.cb .c { color: #8c7a62; }
+.cb .d { color: #cf9269; }
+.cb .f { color: #d9b78e; }
+
+/* ===== responsive ===== */
+@media (max-width: 860px) {
+  /* Desktop pre-zoom is too big on phones — let the layout use full width. */
+  html { zoom: 1; }
+
+  .wrap { padding-left: 18px; padding-right: 18px; }
+
+  /* Collapse nav into a hamburger dropdown. */
+  .nav-burger { display: flex; }
+  .nav-menu {
+    display: none; flex: none; position: absolute; top: 64px; left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 6px;
+    padding: 14px 18px 20px;
+    background: color-mix(in srgb, var(--sand) 96%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-toggle:checked ~ .nav-menu { display: flex; }
+  .nav-links { flex-direction: column; align-items: stretch; gap: 4px; }
+  .nav-links a { padding: 10px 4px; font-size: 16px; }
+  .nav-gh, .nav-cta { margin: 0; justify-content: center; text-align: center; padding: 12px 16px !important; font-size: 15px !important; }
+  .nav-gh { margin-top: 6px; }
+
+  /* Hamburger → X when open. */
+  .nav-toggle:checked ~ .nav-burger span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .nav-toggle:checked ~ .nav-burger span:nth-child(2) { opacity: 0; }
+  .nav-toggle:checked ~ .nav-burger span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  .footer-row { flex-direction: column; align-items: flex-start; gap: 14px; padding: 32px 18px; }
+  .footer-links { flex-wrap: wrap; gap: 18px; }
+  .cb { max-width: 100%; }
+}
+
+/* Install command box: never force horizontal page scroll on small screens. */
+@media (max-width: 520px) {
+  .hero-cmd, [data-os-panel='unix'] { min-width: 0 !important; width: 100%; }
+  [data-os-panel='unix'] code { word-break: break-all; }
+}
