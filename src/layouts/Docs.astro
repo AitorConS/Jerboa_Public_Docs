@@ -8,7 +8,7 @@ type Props = MarkdownLayoutProps<{ title: string; source: string }>;
 const { frontmatter } = Astro.props;
 const markdown = import.meta.glob('../pages/docs/*.md', { eager: true });
 const groups = [
-  { title: 'Start', slugs: ['index', 'getting-started', 'build-concepts'] },
+  { title: 'Start', slugs: ['getting-started', 'build-concepts'] },
   { title: 'Guides', slugs: ['compose', 'observability', 'troubleshooting'] },
   { title: 'Reference', slugs: ['cli-reference', 'architecture'] },
 ].map(group => ({ ...group, pages: group.slugs.map(slug => {
@@ -17,7 +17,7 @@ const groups = [
   return { ...page, headings: module.getHeadings().filter(heading => heading.depth === 2) };
 }) }));
 ---
-<Base title={`jerboa — ${frontmatter.source === 'index.md' ? 'documentation' : frontmatter.title}`}>
+<Base title={`jerboa — ${frontmatter.title}`}>
   <Nav active="docs" />
   <div class="wrap docs-grid">
     <aside aria-label="Documentation navigation">
@@ -26,14 +26,22 @@ const groups = [
         {groups.map(group => <details class="tree-group" open>
           <summary>{group.title}</summary>
           <div class="tree-children">
-            {group.pages.map(page => <details class="tree-page" open={frontmatter.source === `${page.slug}.md`}>
-              <summary>
-                <a href={page.url} aria-current={frontmatter.source === `${page.slug}.md` ? 'page' : undefined}>{page.slug === 'index' ? 'Overview' : page.title}</a>
-              </summary>
-              <div class="tree-children tree-sections">
-                {page.headings.map(heading => <a href={`${page.url}#${heading.slug}`}>{heading.text}</a>)}
+            {group.pages.map(page => {
+              const isCurrent = frontmatter.source === `${page.slug}.md`;
+              return (
+              <div class="tree-page">
+                <div class="tree-row">
+                  <a href={page.url} aria-current={isCurrent ? 'page' : undefined}>{page.title}</a>
+                  {page.headings.length > 0 && <button type="button" class="tree-caret" data-caret={page.slug} aria-expanded={isCurrent ? 'true' : 'false'} aria-label={`Toggle sections for ${page.title}`}></button>}
+                </div>
+                {page.headings.length > 0 && (
+                <div class="tree-children tree-sections" data-sections={page.slug} hidden={!isCurrent}>
+                  {page.headings.map(heading => <a href={`${page.url}#${heading.slug}`}>{heading.text}</a>)}
+                </div>
+                )}
               </div>
-            </details>)}
+              );
+            })}
           </div>
         </details>)}
       </nav>
@@ -43,6 +51,25 @@ const groups = [
     </main>
   </div>
   <Footer />
+<script>
+  // Section toggles: expand/collapse a page's headings without navigating.
+  const bindTree = () => {
+    document.querySelectorAll('[data-caret]').forEach((btn) => {
+      if (!(btn instanceof HTMLButtonElement) || btn.hasAttribute('data-bound')) return;
+      btn.setAttribute('data-bound', '');
+      btn.addEventListener('click', () => {
+        const panel = document.querySelector(`[data-sections="${btn.getAttribute('data-caret')}"]`);
+        if (!(panel instanceof HTMLElement)) return;
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', String(!expanded));
+        if (expanded) panel.setAttribute('hidden', '');
+        else panel.removeAttribute('hidden');
+      });
+    });
+  };
+  bindTree();
+  document.addEventListener('astro:page-load', bindTree);
+</script>
 </Base>
 <style>
   .docs-grid { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: 56px; padding-top: 40px; padding-bottom: 80px; }
@@ -62,12 +89,16 @@ const groups = [
   .tree-group > summary { font-weight: 600; }
   .tree-children { border-left: 1px solid var(--border); margin: 4px 0 4px 2px; padding-left: 17px; }
   .doc-tree a { display: block; color: var(--ink); padding: 3px 7px; border-radius: 4px; line-height: 1.45; }
-  .tree-page > summary { padding: 1px 0; }
+  .tree-row { display: flex; align-items: baseline; gap: 10px; padding: 1px 0; }
+  .tree-row a { flex: 1; min-width: 0; }
+  .tree-caret { flex: 0 0 auto; width: 20px; height: 20px; background: none; border: none; cursor: pointer; padding: 0; position: relative; top: 3px; }
+  .tree-caret::before { content: ''; display: block; width: 5px; height: 5px; margin: 0 auto; border-right: 1px solid var(--muted); border-bottom: 1px solid var(--muted); transform: rotate(-45deg); }
+  .tree-caret[aria-expanded='true']::before { transform: rotate(45deg); }
   .tree-sections { margin-left: 2px; }
   .tree-sections a { color: var(--muted); font-size: 13px; margin: 3px 0; }
   .doc-tree a:hover, .doc-tree a[aria-current] { background: var(--surface); color: var(--ink); }
   .doc-tree a[aria-current] { font-weight: 500; }
-  .doc-tree summary:focus-visible, .doc-tree a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .doc-tree summary:focus-visible, .doc-tree a:focus-visible, .tree-caret:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .doc-main { min-width: 0; line-height: 1.75; overflow-wrap: anywhere; }
   .doc-main :global(h1) { font-family: 'Newsreader', serif; font-size: clamp(36px, 5vw, 56px); line-height: 1.15; font-weight: 300; margin-bottom: 24px; }
   .doc-main :global(h2) { margin: 36px 0 16px; font-size: 26px; }

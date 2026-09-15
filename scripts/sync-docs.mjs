@@ -14,7 +14,7 @@ try {
 } catch (error) {
   if (error.code !== 'ENOENT') throw error;
   if (!optional || process.env.JERBOA_SOURCE) throw new Error(`Jerboa source missing: ${source}. Set JERBOA_SOURCE to its checkout.`);
-  await access(path.join(destination, 'index.md'));
+  await access(path.join(destination, 'getting-started.md'));
   console.log('Jerboa checkout absent; using the committed documentation snapshot.');
   process.exit(0);
 }
@@ -27,6 +27,7 @@ const files = (await readdir(path.join(source, 'docs'))).filter(name => name.end
 const pages = [];
 const outputs = new Map();
 for (const file of files) {
+  if (file === 'index.md') continue; // /docs/ redirects to getting-started; see src/pages/docs/index.astro
   const raw = await readFile(path.join(source, 'docs', file), 'utf8');
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
   if (!match) throw new Error(`Missing frontmatter: ${file}`);

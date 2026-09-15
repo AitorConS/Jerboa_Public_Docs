@@ -1,0 +1,13 @@
+---
+import Base from '../../layouts/Base.astro';
+
+// /docs/ has no overview page; the engine's index.md is skipped by
+// scripts/sync-docs.mjs. Redirect to the first guide instead.
+---
+<Base title="jerboa — documentation">
+  <meta http-equiv="refresh" content="0; url=/docs/getting-started/" />
+  <main class="wrap" style="padding:80px 28px">
+    <p>Redirecting to <a href="/docs/getting-started/">getting started</a>…</p>
+  </main>
+  <script>location.replace('/docs/getting-started/');</script>
+</Base>
