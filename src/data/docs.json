@@ -7,43 +7,43 @@
     {
       "title": "Getting Started",
       "slug": "getting-started",
-      "url": "/docs/getting-started/",
+      "url": "/getting-started/",
       "order": 2
     },
     {
       "title": "Build Concepts",
       "slug": "build-concepts",
-      "url": "/docs/build-concepts/",
+      "url": "/build-concepts/",
       "order": 3
     },
     {
       "title": "CLI Reference",
       "slug": "cli-reference",
-      "url": "/docs/cli-reference/",
+      "url": "/cli-reference/",
       "order": 4
     },
     {
       "title": "Compose",
       "slug": "compose",
-      "url": "/docs/compose/",
+      "url": "/compose/",
       "order": 5
     },
     {
       "title": "Architecture",
       "slug": "architecture",
-      "url": "/docs/architecture/",
+      "url": "/architecture/",
       "order": 6
     },
     {
       "title": "Observability",
       "slug": "observability",
-      "url": "/docs/observability/",
+      "url": "/observability/",
       "order": 7
     },
     {
       "title": "Troubleshooting",
       "slug": "troubleshooting",
-      "url": "/docs/troubleshooting/",
+      "url": "/troubleshooting/",
       "order": 8
     }
   ]

@@ -13,7 +13,7 @@ pnpm install
 pnpm run dev
 ```
 
-Open http://localhost:4321/docs/.
+Open http://localhost:4321/.
 
 ## Documentation synchronization
 
@@ -32,8 +32,9 @@ and `kernel/VERSION`.
 
 `dev` and `build` synchronize once before starting when the sibling checkout is
 available. For another checkout location, set `JERBOA_SOURCE=/path/to/jerboa`.
-Commit `src/pages/docs/*.md` and `src/data/docs.json` together. Do not edit
-these generated files directly.
+Commit `src/pages/*.md` and `src/data/docs.json` together. Do not edit
+these generated files directly. (`/` redirects to `/getting-started/`; the
+engine's `index.md` is skipped by the sync.)
 
 A standalone checkout builds using the committed snapshot when `../jerboa`
 is absent.
@@ -49,8 +50,8 @@ src/
     Footer.astro           — site footer
     CodeBlock.astro        — terminal-style copyable code block
   pages/
-    index.astro            — redirect to /docs/
-    docs/*.md              — generated documentation pages
+    index.astro            — redirect to /getting-started/
+    *.md                   — generated documentation pages
   data/docs.json          — generated navigation and source versions
   styles/global.css        — design tokens + shared classes
 ```

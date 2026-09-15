@@ -6,14 +6,14 @@ import docs from '../data/docs.json';
 import type { MarkdownLayoutProps } from 'astro';
 type Props = MarkdownLayoutProps<{ title: string; source: string }>;
 const { frontmatter } = Astro.props;
-const markdown = import.meta.glob('../pages/docs/*.md', { eager: true });
+const markdown = import.meta.glob('../pages/*.md', { eager: true });
 const groups = [
   { title: 'Start', slugs: ['getting-started', 'build-concepts'] },
   { title: 'Guides', slugs: ['compose', 'observability', 'troubleshooting'] },
   { title: 'Reference', slugs: ['cli-reference', 'architecture'] },
 ].map(group => ({ ...group, pages: group.slugs.map(slug => {
   const page = docs.pages.find(page => page.slug === slug)!;
-  const module = markdown[`../pages/docs/${slug}.md`] as { getHeadings: () => { depth: number; slug: string; text: string }[] };
+  const module = markdown[`../pages/${slug}.md`] as { getHeadings: () => { depth: number; slug: string; text: string }[] };
   return { ...page, headings: module.getHeadings().filter(heading => heading.depth === 2) };
 }) }));
 ---

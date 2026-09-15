@@ -1,5 +1,5 @@
 ---
-layout: ../../layouts/Docs.astro
+layout: ../layouts/Docs.astro
 title: "Compose"
 source: "compose.md"
 ---
