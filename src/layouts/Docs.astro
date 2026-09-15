@@ -30,10 +30,12 @@ const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.
           <details class="tree-group" open={hasCurrent} data-group={group.title}>
             <summary>{group.title}</summary>
             <div class="tree-children">
-              {group.pages.map(page => {
-                const isCurrent = `${page.slug}.md` === frontmatter.source;
-                return <a href={page.url} aria-current={isCurrent ? 'page' : undefined}>{page.title}</a>;
-              })}
+              <div class="tree-links">
+                {group.pages.map(page => {
+                  const isCurrent = `${page.slug}.md` === frontmatter.source;
+                  return <a href={page.url} aria-current={isCurrent ? 'page' : undefined}>{page.title}</a>;
+                })}
+              </div>
             </div>
           </details>
           );
