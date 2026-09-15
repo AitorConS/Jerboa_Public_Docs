@@ -53,36 +53,34 @@ const groups = [
   <Footer />
 <script>
   // Section toggles: expand/collapse a page's headings without navigating.
-  // Open state is kept in a session store so ClientRouter page changes stop
-  // resetting every manually expanded section back to server state.
+  // State is kept in a session store so ClientRouter page changes stop
+  // resetting the sidebar. Stored state wins; keys missing from the store
+  // are seeded from the server render (current page expanded, rest collapsed).
   const sectionStore = ((window as any).__docsSections ??= {});
-  const applySections = () => {
+  const syncSections = () => {
     document.querySelectorAll('[data-caret]').forEach((btn) => {
       if (!(btn instanceof HTMLButtonElement)) return;
       const slug = btn.getAttribute('data-caret') ?? '';
-      if (!(slug in sectionStore)) return;
       const panel = document.querySelector(`[data-sections="${slug}"]`);
       if (!(panel instanceof HTMLElement)) return;
-      const expanded = sectionStore[slug];
-      btn.setAttribute('aria-expanded', String(expanded));
-      if (expanded) panel.removeAttribute('hidden');
-      else panel.setAttribute('hidden', '');
-    });
-  };
-  const bindTree = () => {
-    document.querySelectorAll('[data-caret]').forEach((btn) => {
-      if (!(btn instanceof HTMLButtonElement) || btn.hasAttribute('data-bound')) return;
-      btn.setAttribute('data-bound', '');
-      btn.addEventListener('click', () => {
-        const slug = btn.getAttribute('data-caret') ?? '';
-        const panel = document.querySelector(`[data-sections="${slug}"]`);
-        if (!(panel instanceof HTMLElement)) return;
-        const expanded = btn.getAttribute('aria-expanded') === 'true';
-        btn.setAttribute('aria-expanded', String(!expanded));
-        sectionStore[slug] = !expanded;
-        if (expanded) panel.setAttribute('hidden', '');
-        else panel.removeAttribute('hidden');
-      });
+      if (slug in sectionStore) {
+        const expanded = sectionStore[slug];
+        btn.setAttribute('aria-expanded', String(expanded));
+        if (expanded) panel.removeAttribute('hidden');
+        else panel.setAttribute('hidden', '');
+      } else {
+        sectionStore[slug] = btn.getAttribute('aria-expanded') === 'true';
+      }
+      if (!btn.hasAttribute('data-bound')) {
+        btn.setAttribute('data-bound', '');
+        btn.addEventListener('click', () => {
+          const expanded = btn.getAttribute('aria-expanded') === 'true';
+          btn.setAttribute('aria-expanded', String(!expanded));
+          sectionStore[slug] = !expanded;
+          if (expanded) panel.setAttribute('hidden', '');
+          else panel.removeAttribute('hidden');
+        });
+      }
     });
   };
   // Category toggles are independent (no shared `name`), and their open
@@ -100,10 +98,9 @@ const groups = [
       }
     });
   };
-  bindTree();
-  applySections();
+  syncSections();
   syncGroups();
-  document.addEventListener('astro:page-load', () => { bindTree(); applySections(); syncGroups(); });
+  document.addEventListener('astro:page-load', () => { syncSections(); syncGroups(); });
 </script>
 </Base>
 <style>
