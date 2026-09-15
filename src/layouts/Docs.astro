@@ -130,10 +130,51 @@ const groups = [
   .tree-row { display: flex; align-items: baseline; gap: 10px; padding: 1px 0; }
   .tree-row a { flex: 1; min-width: 0; }
   .tree-caret { flex: 0 0 auto; width: 20px; height: 20px; background: none; border: none; cursor: pointer; padding: 0; position: relative; top: 3px; }
-  .tree-caret::before { content: ''; display: block; width: 5px; height: 5px; margin: 0 auto; border-right: 1px solid var(--muted); border-bottom: 1px solid var(--muted); transform: rotate(-45deg); }
+  .tree-caret::before { content: ''; display: block; width: 5px; height: 5px; margin: 0 auto; border-right: 1px solid var(--muted); border-bottom: 1px solid var(--muted); transform: rotate(-45deg); transition: transform .2s ease; }
   .tree-caret[aria-expanded='true']::before { transform: rotate(45deg); }
   .tree-sections { margin-left: 2px; }
   .tree-sections a { color: var(--muted); font-size: 13px; margin: 3px 0; }
+  /* Smooth expand/collapse for categories and sections (same feel as the
+     smooth scrolling). Grid-rows trick; instant fallback with reduced
+     motion or where ::details-content is unsupported. */
+  @media (prefers-reduced-motion: no-preference) {
+    .doc-tree summary::before { transition: transform .2s ease; }
+    .tree-sections {
+      display: grid;
+      grid-template-rows: 1fr;
+      opacity: 1;
+      transition: grid-template-rows .25s ease, opacity .2s ease, margin-top .25s ease, margin-bottom .25s ease, visibility 0s;
+    }
+    .tree-sections[hidden] {
+      display: grid;
+      grid-template-rows: 0fr;
+      opacity: 0;
+      visibility: hidden;
+      margin-top: 0;
+      margin-bottom: 0;
+      transition: grid-template-rows .25s ease, opacity .2s ease, margin-top .25s ease, margin-bottom .25s ease, visibility 0s .25s;
+    }
+    .tree-sections > * { min-height: 0; overflow: hidden; }
+    @supports selector(details::details-content) {
+      details.tree-group::details-content { content-visibility: visible; }
+      .tree-group > .tree-children {
+        display: grid;
+        grid-template-rows: 1fr;
+        opacity: 1;
+        transition: grid-template-rows .25s ease, opacity .2s ease, margin-top .25s ease, margin-bottom .25s ease, visibility 0s;
+      }
+      .tree-group:not([open]) > .tree-children {
+        display: grid;
+        grid-template-rows: 0fr;
+        opacity: 0;
+        visibility: hidden;
+        margin-top: 0;
+        margin-bottom: 0;
+        transition: grid-template-rows .25s ease, opacity .2s ease, margin-top .25s ease, margin-bottom .25s ease, visibility 0s .25s;
+      }
+      .tree-group > .tree-children > * { min-height: 0; overflow: hidden; }
+    }
+  }
   .doc-tree a:hover, .doc-tree a[aria-current] { background: var(--surface); color: var(--ink); }
   .doc-tree a[aria-current] { font-weight: 500; }
   .doc-tree summary:focus-visible, .doc-tree a:focus-visible, .tree-caret:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
