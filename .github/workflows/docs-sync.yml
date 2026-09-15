@@ -1,0 +1,27 @@
+name: docs-sync
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: AitorConS/jerboa
+          path: engine
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: JERBOA_SOURCE=engine pnpm run docs:sync
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: 'docs: sync from jerboa engine'
+          title: 'docs: sync from jerboa engine'
+          body: 'Regenerated documentation snapshot from AitorConS/jerboa docs.'
+          branch: chore/docs-sync

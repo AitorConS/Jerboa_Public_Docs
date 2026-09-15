@@ -4,5 +4,17 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm run build",
   "outputDirectory": "dist",
-  "trailingSlash": true
+  "trailingSlash": true,
+  "redirects": [
+    {
+      "source": "/index.html",
+      "destination": "https://docs.jerboa.dev/docs/",
+      "permanent": true
+    },
+    {
+      "source": "/:page.html",
+      "destination": "https://docs.jerboa.dev/docs/:page/",
+      "permanent": true
+    }
+  ]
 }
