@@ -23,7 +23,7 @@ const groups = [
     <aside aria-label="Documentation navigation">
       <p class="eyebrow">Documentation · v{docs.versions.cli}</p>
       <nav class="doc-tree" aria-label="Guides">
-        {groups.map(group => <details class="tree-group" open>
+        {groups.map(group => <details class="tree-group" open data-group={group.title}>
           <summary>{group.title}</summary>
           <div class="tree-children">
             {group.pages.map(page => {
@@ -67,8 +67,24 @@ const groups = [
       });
     });
   };
+  // Category toggles are independent (no shared `name`), and their open
+  // state survives ClientRouter navigations via this session store. Without
+  // it the server would re-render every group as open on each page change.
+  const groupStore = ((window as any).__docsGroups ??= {});
+  const syncGroups = () => {
+    document.querySelectorAll('details.tree-group').forEach((d) => {
+      if (!(d instanceof HTMLDetailsElement)) return;
+      const key = d.getAttribute('data-group') ?? '';
+      if (key in groupStore) d.open = groupStore[key];
+      if (!d.hasAttribute('data-group-bound')) {
+        d.setAttribute('data-group-bound', '');
+        d.addEventListener('toggle', () => { groupStore[key] = d.open; });
+      }
+    });
+  };
   bindTree();
-  document.addEventListener('astro:page-load', bindTree);
+  syncGroups();
+  document.addEventListener('astro:page-load', () => { bindTree(); syncGroups(); });
 </script>
 </Base>
 <style>
