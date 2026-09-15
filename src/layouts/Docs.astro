@@ -16,6 +16,7 @@ const groups = [
   const module = markdown[`../pages/${slug}.md`] as { getHeadings: () => { depth: number; slug: string; text: string }[] };
   return { ...page, headings: module.getHeadings().filter(heading => heading.depth === 2) };
 }) }));
+const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.md` === frontmatter.source);
 ---
 <Base title={`jerboa — ${frontmatter.title}`}>
   <Nav active="docs" />
@@ -23,69 +24,40 @@ const groups = [
     <aside aria-label="Documentation navigation">
       <p class="eyebrow">Documentation · v{docs.versions.cli}</p>
       <nav class="doc-tree" aria-label="Guides">
-        {groups.map(group => <details class="tree-group" open data-group={group.title}>
-          <summary>{group.title}</summary>
-          <div class="tree-children">
-            {group.pages.map(page => {
-              const isCurrent = frontmatter.source === `${page.slug}.md`;
-              return (
-              <div class="tree-page">
-                <div class="tree-row">
-                  <a href={page.url} aria-current={isCurrent ? 'page' : undefined}>{page.title}</a>
-                  {page.headings.length > 0 && <button type="button" class="tree-caret" data-caret={page.slug} aria-expanded={isCurrent ? 'true' : 'false'} aria-label={`Toggle sections for ${page.title}`}></button>}
-                </div>
-                {page.headings.length > 0 && (
-                <div class="tree-children tree-sections" data-sections={page.slug} hidden={!isCurrent}>
-                  {page.headings.map(heading => <a href={`${page.url}#${heading.slug}`}>{heading.text}</a>)}
-                </div>
-                )}
-              </div>
-              );
-            })}
-          </div>
-        </details>)}
+        {groups.map(group => {
+          const hasCurrent = group.pages.some(page => `${page.slug}.md` === frontmatter.source);
+          return (
+          <details class="tree-group" open={hasCurrent} data-group={group.title}>
+            <summary>{group.title}</summary>
+            <div class="tree-children">
+              {group.pages.map(page => {
+                const isCurrent = `${page.slug}.md` === frontmatter.source;
+                return <a href={page.url} aria-current={isCurrent ? 'page' : undefined}>{page.title}</a>;
+              })}
+            </div>
+          </details>
+          );
+        })}
       </nav>
     </aside>
     <main class="doc-main">
       <slot />
     </main>
+    {current && current.headings.length > 0 && (
+    <nav class="toc" aria-label="On this page">
+      <p class="eyebrow">On this page</p>
+      <ul>
+        {current.headings.map(heading => <li><a href={`#${heading.slug}`} data-toc-link>{heading.text}</a></li>)}
+      </ul>
+    </nav>
+    )}
   </div>
   <Footer />
 <script>
-  // Section toggles: expand/collapse a page's headings without navigating.
-  // State is kept in a session store so ClientRouter page changes stop
-  // resetting the sidebar. Stored state wins; keys missing from the store
-  // are seeded from the server render (current page expanded, rest collapsed).
-  const sectionStore = ((window as any).__docsSections ??= {});
-  const syncSections = () => {
-    document.querySelectorAll('[data-caret]').forEach((btn) => {
-      if (!(btn instanceof HTMLButtonElement)) return;
-      const slug = btn.getAttribute('data-caret') ?? '';
-      const panel = document.querySelector(`[data-sections="${slug}"]`);
-      if (!(panel instanceof HTMLElement)) return;
-      if (slug in sectionStore) {
-        const expanded = sectionStore[slug];
-        btn.setAttribute('aria-expanded', String(expanded));
-        if (expanded) panel.removeAttribute('hidden');
-        else panel.setAttribute('hidden', '');
-      } else {
-        sectionStore[slug] = btn.getAttribute('aria-expanded') === 'true';
-      }
-      if (!btn.hasAttribute('data-bound')) {
-        btn.setAttribute('data-bound', '');
-        btn.addEventListener('click', () => {
-          const expanded = btn.getAttribute('aria-expanded') === 'true';
-          btn.setAttribute('aria-expanded', String(!expanded));
-          sectionStore[slug] = !expanded;
-          if (expanded) panel.setAttribute('hidden', '');
-          else panel.removeAttribute('hidden');
-        });
-      }
-    });
-  };
   // Category toggles are independent (no shared `name`), and their open
   // state survives ClientRouter navigations via this session store. Without
-  // it the server would re-render every group as open on each page change.
+  // it the server render (only the current branch open) would reset the
+  // sidebar on each page change.
   const groupStore = ((window as any).__docsGroups ??= {});
   const syncGroups = () => {
     document.querySelectorAll('details.tree-group').forEach((d) => {
@@ -98,9 +70,25 @@ const groups = [
       }
     });
   };
-  syncSections();
+  // Scrollspy for the "On this page" column: highlight the section in view.
+  const setupSpy = () => {
+    ((window as any).__tocObserver)?.disconnect();
+    const links = Array.from(document.querySelectorAll('[data-toc-link]'));
+    if (!links.length) return;
+    const byId = new Map(links.map((l) => [(l as HTMLAnchorElement).getAttribute('href')?.slice(1), l]));
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        links.forEach((l) => l.removeAttribute('aria-current'));
+        byId.get((entry.target as HTMLElement).id)?.setAttribute('aria-current', 'true');
+      }
+    }, { rootMargin: '-90px 0px -70% 0px' });
+    document.querySelectorAll('.doc-main h2[id]').forEach((h) => observer.observe(h));
+    (window as any).__tocObserver = observer;
+  };
   syncGroups();
-  document.addEventListener('astro:page-load', () => { syncSections(); syncGroups(); });
+  setupSpy();
+  document.addEventListener('astro:page-load', () => { syncGroups(); setupSpy(); });
 </script>
 </Base>
 <style>
@@ -110,7 +98,7 @@ const groups = [
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
   }
-  .docs-grid { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: 56px; padding-top: 40px; padding-bottom: 80px; }
+  .docs-grid { display: grid; grid-template-columns: 240px minmax(0, 1fr) 200px; align-items: start; gap: 48px; padding-top: 40px; padding-bottom: 80px; }
   aside { position: sticky; top: 88px; max-height: calc(100dvh / 1.25 - 110px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 34%, transparent) transparent; }
   aside::-webkit-scrollbar { width: 9px; }
   aside::-webkit-scrollbar-track { background: transparent; }
@@ -127,34 +115,17 @@ const groups = [
   .tree-group > summary { font-weight: 600; }
   .tree-children { border-left: 1px solid var(--border); margin: 4px 0 4px 2px; padding-left: 17px; }
   .doc-tree a { display: block; color: var(--ink); padding: 3px 7px; border-radius: 4px; line-height: 1.45; }
-  .tree-row { display: flex; align-items: baseline; gap: 10px; padding: 1px 0; }
-  .tree-row a { flex: 1; min-width: 0; }
-  .tree-caret { flex: 0 0 auto; width: 20px; height: 20px; background: none; border: none; cursor: pointer; padding: 0; position: relative; top: 3px; }
-  .tree-caret::before { content: ''; display: block; width: 5px; height: 5px; margin: 0 auto; border-right: 1px solid var(--muted); border-bottom: 1px solid var(--muted); transform: rotate(-45deg); transition: transform .2s ease; }
-  .tree-caret[aria-expanded='true']::before { transform: rotate(45deg); }
-  .tree-sections { margin-left: 2px; }
-  .tree-sections a { color: var(--muted); font-size: 13px; margin: 3px 0; }
-  /* Smooth expand/collapse for categories and sections (same feel as the
-     smooth scrolling). Grid-rows trick; instant fallback with reduced
-     motion or where ::details-content is unsupported. */
+  .toc { position: sticky; top: 88px; max-height: calc(100dvh / 1.25 - 110px); overflow-y: auto; font-size: 13px; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 34%, transparent) transparent; }
+  .toc ul { list-style: none; border-left: 1px solid var(--border); padding-left: 16px; }
+  .toc a { display: block; color: var(--muted); padding: 3px 0; line-height: 1.5; }
+  .toc a:hover { color: var(--ink); }
+  .toc a[aria-current='true'] { color: var(--accent); font-weight: 500; }
+  .toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Smooth expand/collapse for categories (same feel as the smooth
+     scrolling). Grid-rows trick; instant fallback with reduced motion
+     or where ::details-content is unsupported. */
   @media (prefers-reduced-motion: no-preference) {
     .doc-tree summary::before { transition: transform .2s ease; }
-    .tree-sections {
-      display: grid;
-      grid-template-rows: 1fr;
-      opacity: 1;
-      transition: grid-template-rows .25s ease, opacity .2s ease, margin-top .25s ease, margin-bottom .25s ease, visibility 0s;
-    }
-    .tree-sections[hidden] {
-      display: grid;
-      grid-template-rows: 0fr;
-      opacity: 0;
-      visibility: hidden;
-      margin-top: 0;
-      margin-bottom: 0;
-      transition: grid-template-rows .25s ease, opacity .2s ease, margin-top .25s ease, margin-bottom .25s ease, visibility 0s .25s;
-    }
-    .tree-sections > * { min-height: 0; overflow: hidden; }
     @supports selector(details::details-content) {
       details.tree-group::details-content { content-visibility: visible; }
       .tree-group > .tree-children {
@@ -177,7 +148,7 @@ const groups = [
   }
   .doc-tree a:hover, .doc-tree a[aria-current] { background: var(--surface); color: var(--ink); }
   .doc-tree a[aria-current] { font-weight: 500; }
-  .doc-tree summary:focus-visible, .doc-tree a:focus-visible, .tree-caret:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .doc-tree summary:focus-visible, .doc-tree a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .doc-main { min-width: 0; line-height: 1.75; overflow-wrap: anywhere; }
   .doc-main :global(h1) { font-family: 'Newsreader', serif; font-size: clamp(36px, 5vw, 56px); line-height: 1.15; font-weight: 300; margin-bottom: 24px; }
   .doc-main :global(h2) { margin: 36px 0 16px; font-size: 26px; }
@@ -194,6 +165,10 @@ const groups = [
   .doc-main :global(th) { background: var(--surface); }
   .doc-main :global(blockquote) { border-left: 3px solid var(--accent); padding-left: 18px; color: var(--muted); }
   .doc-main :global(hr) { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
+  @media (max-width: 1100px) {
+    .docs-grid { grid-template-columns: 240px minmax(0, 1fr); gap: 48px; }
+    .toc { display: none; }
+  }
   @media (max-width: 800px) {
     .docs-grid { grid-template-columns: 1fr; gap: 28px; }
     aside { position: static; max-height: none; }
