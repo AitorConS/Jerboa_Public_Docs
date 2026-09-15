@@ -104,6 +104,12 @@ const groups = [
 </script>
 </Base>
 <style>
+  /* Docs override the global no-smooth-scroll rule: article changes and
+     in-page anchors scroll smoothly instead of jumping to the top. */
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
   .docs-grid { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: 56px; padding-top: 40px; padding-bottom: 80px; }
   aside { position: sticky; top: 88px; max-height: calc(100dvh / 1.25 - 110px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 34%, transparent) transparent; }
   aside::-webkit-scrollbar { width: 9px; }
