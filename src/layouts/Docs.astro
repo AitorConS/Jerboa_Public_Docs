@@ -53,15 +53,33 @@ const groups = [
   <Footer />
 <script>
   // Section toggles: expand/collapse a page's headings without navigating.
+  // Open state is kept in a session store so ClientRouter page changes stop
+  // resetting every manually expanded section back to server state.
+  const sectionStore = ((window as any).__docsSections ??= {});
+  const applySections = () => {
+    document.querySelectorAll('[data-caret]').forEach((btn) => {
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const slug = btn.getAttribute('data-caret') ?? '';
+      if (!(slug in sectionStore)) return;
+      const panel = document.querySelector(`[data-sections="${slug}"]`);
+      if (!(panel instanceof HTMLElement)) return;
+      const expanded = sectionStore[slug];
+      btn.setAttribute('aria-expanded', String(expanded));
+      if (expanded) panel.removeAttribute('hidden');
+      else panel.setAttribute('hidden', '');
+    });
+  };
   const bindTree = () => {
     document.querySelectorAll('[data-caret]').forEach((btn) => {
       if (!(btn instanceof HTMLButtonElement) || btn.hasAttribute('data-bound')) return;
       btn.setAttribute('data-bound', '');
       btn.addEventListener('click', () => {
-        const panel = document.querySelector(`[data-sections="${btn.getAttribute('data-caret')}"]`);
+        const slug = btn.getAttribute('data-caret') ?? '';
+        const panel = document.querySelector(`[data-sections="${slug}"]`);
         if (!(panel instanceof HTMLElement)) return;
         const expanded = btn.getAttribute('aria-expanded') === 'true';
         btn.setAttribute('aria-expanded', String(!expanded));
+        sectionStore[slug] = !expanded;
         if (expanded) panel.setAttribute('hidden', '');
         else panel.removeAttribute('hidden');
       });
@@ -83,8 +101,9 @@ const groups = [
     });
   };
   bindTree();
+  applySections();
   syncGroups();
-  document.addEventListener('astro:page-load', () => { bindTree(); syncGroups(); });
+  document.addEventListener('astro:page-load', () => { bindTree(); applySections(); syncGroups(); });
 </script>
 </Base>
 <style>
