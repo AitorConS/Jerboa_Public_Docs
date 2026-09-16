@@ -3,6 +3,7 @@
   "type": "module",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.25.0",
   "scripts": {
     "dev": "node scripts/sync-docs.mjs --if-present && astro dev",
     "build": "node scripts/sync-docs.mjs --if-present && astro build",
