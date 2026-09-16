@@ -9,8 +9,9 @@ const { frontmatter } = Astro.props;
 const markdown = import.meta.glob('../pages/*.md', { eager: true });
 const groups = [
   { title: 'Start', slugs: ['getting-started', 'build-concepts'] },
-  { title: 'Guides', slugs: ['compose', 'observability', 'troubleshooting'] },
+  { title: 'Guides', slugs: ['macos-guide', 'compose', 'observability', 'troubleshooting'] },
   { title: 'Reference', slugs: ['cli-reference', 'architecture'] },
+  { title: 'macOS (advanced)', slugs: ['macos', 'macos-firecracker', 'packages-arm64', 'postgres-arm64', 'macos-snapshots', 'macos-shutdown', 'macos-stats', 'macos-distribution'] },
 ].map(group => ({ ...group, pages: group.slugs.map(slug => {
   const page = docs.pages.find(page => page.slug === slug)!;
   const module = markdown[`../pages/${slug}.md`] as { getHeadings: () => { depth: number; slug: string; text: string }[] };

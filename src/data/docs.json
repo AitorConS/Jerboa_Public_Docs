@@ -1,6 +1,6 @@
 {
   "versions": {
-    "cli": "0.51.2",
+    "cli": "0.54.0",
     "kernel": "0.2.0"
   },
   "pages": [
@@ -45,6 +45,60 @@
       "slug": "troubleshooting",
       "url": "/troubleshooting/",
       "order": 8
+    },
+    {
+      "title": "Using Jerboa on macOS",
+      "slug": "macos-guide",
+      "url": "/macos-guide/",
+      "order": 9
+    },
+    {
+      "title": "macOS Apple Silicon",
+      "slug": "macos",
+      "url": "/macos/",
+      "order": 9
+    },
+    {
+      "title": "Firecracker on macOS",
+      "slug": "macos-firecracker",
+      "url": "/macos-firecracker/",
+      "order": 10
+    },
+    {
+      "title": "macOS Firecracker distribution",
+      "slug": "macos-distribution",
+      "url": "/macos-distribution/",
+      "order": 11
+    },
+    {
+      "title": "Linux ARM64 packages on macOS",
+      "slug": "packages-arm64",
+      "url": "/packages-arm64/",
+      "order": 11
+    },
+    {
+      "title": "PostgreSQL ARM64 on Nanos",
+      "slug": "postgres-arm64",
+      "url": "/postgres-arm64/",
+      "order": 12
+    },
+    {
+      "title": "Firecracker snapshots on macOS",
+      "slug": "macos-snapshots",
+      "url": "/macos-snapshots/",
+      "order": 13
+    },
+    {
+      "title": "Firecracker shutdown on macOS",
+      "slug": "macos-shutdown",
+      "url": "/macos-shutdown/",
+      "order": 14
+    },
+    {
+      "title": "macOS VM statistics",
+      "slug": "macos-stats",
+      "url": "/macos-stats/",
+      "order": 15
     }
   ]
 }
