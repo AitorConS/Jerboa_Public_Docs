@@ -156,6 +156,15 @@ jerboa pkg list                   # locally cached packages
 Node and Python builds resolve their runtime package **automatically**
 (`node:20`, `python:3.12`) — you only declare extra packages.
 
+If a file from your project and a file from a package land at the same path in
+the image (for example, both ship a `README.md` at the root), **your project's
+file wins**, just like a `COPY` in a Dockerfile replaces what the base image had
+there. Two packages that place different files at the same path still fail the
+build.
+
+On an Apple Silicon Mac, packages are downloaded in their ARM64 variant. See
+[Using Jerboa on macOS](/macos-guide/#building-images-for-the-mac).
+
 ## The Program Path (And Its Trap)
 
 For raw builds, `[program] path` is matched against the package's files by
@@ -271,7 +280,7 @@ jerboa build . --name redis
 ```
 
 The build reads a `unikernel.toml` that names the package and the program to run
-(a from-docker package records no default program, so `[program]` is required):
+(`[program]` explicitly selects what the raw build will execute):
 
 ```toml
 [build]
@@ -291,6 +300,9 @@ coreutils. Images that start through a shell script (the common
 `docker-entrypoint.sh` pattern) cannot be derived automatically — there is no
 shell in a unikernel — so pass `--file` with the real binary the script
 eventually launches.
+
+For platform variants, local sysroots and tested ARM64 examples, see
+[Linux ARM64 packages on macOS](/packages-arm64/).
 
 ## Scaffolding: `jerboa init`
 
