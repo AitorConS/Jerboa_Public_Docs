@@ -1,6 +1,6 @@
 {
   "versions": {
-    "cli": "0.54.1",
+    "cli": "0.54.2",
     "kernel": "0.2.0"
   },
   "pages": [
@@ -99,6 +99,12 @@
       "slug": "macos-stats",
       "url": "/macos-stats/",
       "order": 15
+    },
+    {
+      "title": "Benchmarks",
+      "slug": "benchmarks",
+      "url": "/benchmarks/",
+      "order": 16
     }
   ]
 }
