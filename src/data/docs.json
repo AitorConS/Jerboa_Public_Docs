@@ -95,6 +95,12 @@
       "order": 14
     },
     {
+      "title": "Release operations",
+      "slug": "release-process",
+      "url": "/release-process/",
+      "order": 14
+    },
+    {
       "title": "macOS VM statistics",
       "slug": "macos-stats",
       "url": "/macos-stats/",
