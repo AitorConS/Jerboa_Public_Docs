@@ -30,7 +30,7 @@ for (const file of files) {
   if (file === 'index.md') continue; // / redirects to getting-started; see src/pages/index.astro
   const raw = await readFile(path.join(source, 'docs', file), 'utf8');
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
-  if (!match) throw new Error(`Missing frontmatter: ${file}`);
+  if (!match) continue; // no frontmatter: a working note, not a site page
   const title = match[1].match(/^title:\s*(.+)$/m)?.[1];
   const order = Number(match[1].match(/^nav_order:\s*(\d+)$/m)?.[1]);
   if (!title || !order) throw new Error(`Missing navigation metadata: ${file}`);

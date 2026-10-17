@@ -1,7 +1,7 @@
 {
   "versions": {
-    "cli": "0.54.2",
-    "kernel": "0.2.0"
+    "cli": "0.55.0",
+    "kernel": "0.2.2"
   },
   "pages": [
     {
@@ -92,6 +92,12 @@
       "title": "Firecracker shutdown on macOS",
       "slug": "macos-shutdown",
       "url": "/macos-shutdown/",
+      "order": 14
+    },
+    {
+      "title": "Release operations",
+      "slug": "release-process",
+      "url": "/release-process/",
       "order": 14
     },
     {
