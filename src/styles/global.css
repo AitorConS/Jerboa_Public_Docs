@@ -1,116 +1,147 @@
 :root {
-  --ink: #2a2118;
-  --sand: #efe7d8;
-  --surface: #f8f3ea;
-  --muted: #6f6151;
-  --accent: #a35b3a;
-  --border: rgba(42, 33, 24, 0.12);
+  --ink: #241c14;
+  --sand: #f1eadd;
+  --surface: #f8f4ec;
+  --muted: #6b5d4e;
+  --accent: #a3532f;
+  --accent-soft: #d58c62;
+  --docker: #7d8b99;
+  --win: #3f7a3a;
+  --loss: #a3412f;
+  --border: rgba(36, 28, 20, 0.13);
+  --term-bg: #211b15;
+  --sans: 'Geist', system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, monospace;
+  --serif: 'Newsreader', Georgia, serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ink: #ece3d4;
+    --sand: #17130f;
+    --surface: #1f1a15;
+    --muted: #a8998a;
+    --accent: #e08a5c;
+    --accent-soft: #e08a5c;
+    --docker: #8a97a4;
+    --win: #8fc07f;
+    --loss: #ec8a72;
+    --border: rgba(236, 227, 212, 0.12);
+    --term-bg: #0f0c09;
+    color-scheme: dark;
+  }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Ship the page pre-zoomed — reads best around 125%. `zoom` scales layout like
-   the browser's own zoom (now standard: Chrome, Safari, Firefox 126+), so
-   px-based sizing stays proportional and reflows normally.
-   NB: no `scroll-behavior: smooth` here on purpose — a smooth scroll animation
-   fights the View Transitions (ClientRouter) scroll reset and aborts it. */
-html { zoom: 1.25; }
+/* No `scroll-behavior: smooth`: a smooth scroll fights the View Transitions
+   (ClientRouter) scroll reset and aborts it. */
+html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
   background: var(--sand);
   color: var(--ink);
-  font-family: 'Geist', system-ui, sans-serif;
+  font: 17px/1.6 var(--sans);
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: rgba(163, 91, 58, 0.22); }
+::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
 
 a { text-decoration: none; color: inherit; }
+a, button, label, summary { touch-action: manipulation; -webkit-tap-highlight-color: color-mix(in srgb, var(--accent) 18%, transparent); }
 
-.jb-link { transition: color .15s ease, opacity .15s ease; }
+/* In-page anchors land below the sticky header. */
+[id] { scroll-margin-top: 80px; }
+
+.skip-link { position: absolute; left: 16px; top: -48px; z-index: 50; padding: 10px 14px; border-radius: 6px; background: var(--ink); color: var(--sand); font-size: 15px; }
+.skip-link:focus { top: 12px; }
+code, kbd { font-family: var(--mono); font-size: .9em; }
+
+.jb-link { transition: color .15s ease; }
 .jb-link:hover { color: var(--accent); }
 .jb-link.is-active { color: var(--accent); font-weight: 500; }
 
-.jb-btn { transition: transform .15s ease, background .15s ease, border-color .15s ease, color .15s ease; }
-.jb-btn:hover { transform: translateY(-1px); }
-
-.jb-card { transition: transform .2s ease, border-color .2s ease; }
-.jb-card:hover { transform: translateY(-3px); border-color: var(--accent); }
-
 /* ===== layout helpers ===== */
-.wrap { max-width: 1180px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+.wrap { max-width: 1160px; margin: 0 auto; padding-left: 32px; padding-right: 32px; }
 
 .site-header {
   position: sticky; top: 0; z-index: 30;
   backdrop-filter: blur(10px);
-  background: color-mix(in srgb, var(--sand) 82%, transparent);
+  background: color-mix(in srgb, var(--sand) 86%, transparent);
   border-bottom: 1px solid var(--border);
 }
-.site-nav { height: 64px; display: flex; align-items: center; gap: 30px; }
-.brand { display: flex; align-items: center; gap: 11px; }
-.brand-mark { width: 42px; height: 42px; object-fit: contain; display: inline-block; }
-.brand-name { font-family: 'Newsreader', serif; font-size: 23px; letter-spacing: -.01em; }
-.nav-menu { display: flex; align-items: center; gap: 24px; flex: 1; }
-.nav-links { display: flex; align-items: center; gap: 24px; font-size: 14.5px; color: var(--muted); }
-.nav-gh { margin-left: auto; }
+.site-nav { height: 64px; display: flex; align-items: center; gap: 32px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark { width: 36px; height: 36px; object-fit: contain; display: inline-block; }
+.brand-name { font-family: var(--serif); font-size: 24px; letter-spacing: -.01em; }
+.nav-menu { display: flex; align-items: center; gap: 28px; flex: 1; }
+.nav-links { display: flex; align-items: center; gap: 26px; font-size: 15px; color: var(--muted); }
+.nav-gh { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--muted); }
+.nav-gh:hover { color: var(--ink); }
+.nav-version { font: 12.5px/1 var(--mono); color: var(--muted); border-left: 1px solid var(--border); padding-left: 16px; }
 .spacer { flex: 1; }
 
-/* Hamburger — hidden on desktop, shown on mobile. */
 .nav-burger { display: none; margin-left: auto; flex-direction: column; justify-content: center; gap: 5px; width: 40px; height: 40px; cursor: pointer; }
 .nav-burger span { display: block; width: 22px; height: 2px; background: var(--ink); border-radius: 2px; transition: transform .2s ease, opacity .2s ease; }
 
+/* ===== shared section type ===== */
+.kicker { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 18px; }
+.h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(32px, 4.2vw, 46px); line-height: 1.08; letter-spacing: -.02em; margin-bottom: 18px; text-wrap: balance; }
+.lede { font-size: 18px; line-height: 1.6; color: var(--muted); max-width: 680px; text-wrap: pretty; }
+.section { padding: 96px 0; border-top: 1px solid var(--border); }
+
+.btn { display: inline-flex; align-items: center; gap: 10px; font: 500 15px/1 var(--sans); padding: 14px 20px; border-radius: 8px; border: 1px solid var(--border); color: var(--ink); transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.btn:hover { border-color: var(--ink); }
+.btn-solid { background: var(--ink); border-color: var(--ink); color: var(--sand); }
+.btn-solid:hover { background: var(--accent); border-color: var(--accent); }
+
 /* ===== footer ===== */
 .site-footer { border-top: 1px solid var(--border); }
-.footer-row { padding: 38px 28px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; max-width: 1180px; margin: 0 auto; }
-.footer-links { display: flex; gap: 24px; font-size: 14px; color: var(--muted); }
+.footer-row { padding: 40px 32px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; max-width: 1160px; margin: 0 auto; }
+.footer-links { display: flex; gap: 26px; font-size: 15px; color: var(--muted); }
+.footer-note { font: 12.5px/1 var(--mono); color: var(--muted); }
 
 /* ===== code blocks ===== */
-.cb { border: 1px solid rgba(233,220,199,.14); border-radius: 11px; overflow: hidden; margin: 16px 0; background: #231d16; max-width: 720px; }
+.cb { border: 1px solid rgba(233,220,199,.14); border-radius: 10px; overflow: hidden; margin: 16px 0; background: var(--term-bg); max-width: 720px; }
 .cb-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid rgba(233,220,199,.1); }
-.cb-head > span { font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: #9c8b73; }
-.code-copy { background: none; border: none; color: #9c8b73; cursor: pointer; font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .04em; transition: color .15s; }
+.cb-head > span { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #9c8b73; }
+.code-copy { background: none; border: none; color: #9c8b73; cursor: pointer; font-family: var(--mono); font-size: 12px; letter-spacing: .04em; transition: color .15s; }
 .code-copy:hover { color: #ecdfca; }
-.cb pre { margin: 0; padding: 15px 18px; overflow-x: auto; font-family: 'Geist Mono', monospace; font-size: 13.5px; line-height: 1.92; color: #e9dcc7; }
-.cb .c { color: #8c7a62; }
-.cb .d { color: #cf9269; }
-.cb .f { color: #d9b78e; }
+.cb pre { margin: 0; padding: 15px 18px; overflow-x: auto; font-family: var(--mono); font-size: 14px; line-height: 1.9; color: #e9dcc7; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
 
 /* ===== responsive ===== */
 @media (max-width: 860px) {
-  /* Desktop pre-zoom is too big on phones — let the layout use full width. */
-  html { zoom: 1; }
+  body { font-size: 16px; }
+  .wrap { padding-left: 16px; padding-right: 16px; }
+  .section { padding: 64px 0; }
 
-  .wrap { padding-left: 18px; padding-right: 18px; }
-
-  /* Collapse nav into a hamburger dropdown. */
   .nav-burger { display: flex; }
   .nav-menu {
     display: none; flex: none; position: absolute; top: 64px; left: 0; right: 0;
     flex-direction: column; align-items: stretch; gap: 6px;
-    padding: 14px 18px 20px;
-    background: color-mix(in srgb, var(--sand) 96%, transparent);
-    backdrop-filter: blur(12px);
+    padding: 14px 16px 20px;
+    background: var(--sand);
     border-bottom: 1px solid var(--border);
   }
   .nav-toggle:checked ~ .nav-menu { display: flex; }
   .nav-links { flex-direction: column; align-items: stretch; gap: 4px; }
-  .nav-links a { padding: 10px 4px; font-size: 16px; }
-  .nav-gh, .nav-cta { margin: 0; justify-content: center; text-align: center; padding: 12px 16px !important; font-size: 15px !important; }
-  .nav-gh { margin-top: 6px; }
+  .nav-links a { padding: 10px 4px; font-size: 17px; }
+  .nav-gh { margin: 6px 0 0; padding: 10px 4px; font-size: 17px; }
+  .nav-version { border: 0; padding: 10px 4px; }
 
-  /* Hamburger → X when open. */
   .nav-toggle:checked ~ .nav-burger span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
   .nav-toggle:checked ~ .nav-burger span:nth-child(2) { opacity: 0; }
   .nav-toggle:checked ~ .nav-burger span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
-  .footer-row { flex-direction: column; align-items: flex-start; gap: 14px; padding: 32px 18px; }
+  .footer-row { flex-direction: column; align-items: flex-start; gap: 14px; padding: 32px 16px; }
   .footer-links { flex-wrap: wrap; gap: 18px; }
   .cb { max-width: 100%; }
-}
-
-/* Install command box: never force horizontal page scroll on small screens. */
-@media (max-width: 520px) {
-  .hero-cmd, [data-os-panel='unix'] { min-width: 0 !important; width: 100%; }
-  [data-os-panel='unix'] code { word-break: break-all; }
 }
