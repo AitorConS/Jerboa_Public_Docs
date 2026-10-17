@@ -113,14 +113,14 @@ const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.
   .tree-children { border-left: var(--hairline) solid var(--border); margin-left: var(--space-4); }
   .doc-tree a { display: flex; align-items: center; min-height: var(--control-lg); margin-left: calc(-1 * var(--hairline)); padding: 0 var(--space-12); border-left: var(--hairline) solid transparent; color: var(--text-muted); transition: color var(--duration-hover) var(--ease-hover), border-color var(--duration-hover) var(--ease-hover); }
   .doc-tree a:hover { color: var(--text); }
-  .doc-tree a[aria-current] { color: var(--text); border-left-color: var(--text); }
+  .doc-tree a[aria-current] { color: var(--accent); border-left-color: var(--text); }
 
   /* ===== on this page ===== */
   .toc { font-size: var(--text-14); }
   .toc ul { list-style: none; border-left: var(--hairline) solid var(--border); }
   .toc a { display: flex; align-items: center; min-height: var(--control-lg); margin-left: calc(-1 * var(--hairline)); padding: 0 var(--space-12); border-left: var(--hairline) solid transparent; color: var(--text-muted); transition: color var(--duration-hover) var(--ease-hover), border-color var(--duration-hover) var(--ease-hover); }
   .toc a:hover { color: var(--text); }
-  .toc a[aria-current='true'] { color: var(--text); border-left-color: var(--text); }
+  .toc a[aria-current='true'] { color: var(--accent); border-left-color: var(--text); }
 
   /* ===== article ===== */
   .doc-main { min-width: 0; max-width: var(--reading); font-size: var(--text-16); line-height: var(--leading-body); overflow-wrap: anywhere; }
@@ -137,8 +137,8 @@ const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.
   .doc-main :global(ul), .doc-main :global(ol) { padding-left: var(--space-24); }
   .doc-main :global(li + li) { margin-top: var(--space-4); }
   .doc-main :global(strong) { color: var(--text); font-weight: var(--weight-display); }
-  .doc-main :global(a) { color: var(--text); text-decoration: underline; text-decoration-color: var(--graphic-muted); text-underline-offset: 0.25em; transition: text-decoration-color var(--duration-hover) var(--ease-hover); }
-  .doc-main :global(a:hover) { text-decoration-color: var(--text); }
+  .doc-main :global(a) { color: var(--accent); text-decoration: underline; text-decoration-color: var(--graphic-muted); text-underline-offset: 0.25em; transition: text-decoration-color var(--duration-hover) var(--ease-hover); }
+  .doc-main :global(a:hover) { text-decoration-color: var(--accent); }
   .doc-main :global(code) { font-family: var(--font-mono); font-size: var(--text-14); }
   .doc-main :global(:not(pre) > code) { padding: 0 var(--space-4); border: var(--hairline) solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); }
   /* Shiki's css-variables theme, mapped onto the stone tokens: monochrome,
@@ -147,7 +147,7 @@ const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.
     --astro-code-foreground: var(--stone-200);
     --astro-code-background: var(--surface);
     --astro-code-token-keyword: var(--text);
-    --astro-code-token-function: var(--text);
+    --astro-code-token-function: var(--accent);   /* commands such as jerboa, sudo, curl */
     --astro-code-token-constant: var(--stone-200);
     --astro-code-token-parameter: var(--stone-200);
     --astro-code-token-string: var(--stone-400);

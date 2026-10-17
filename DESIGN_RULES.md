@@ -18,6 +18,7 @@
 
 - **Primary:** Linear / Vercel / Geist — monochrome stone, 1px borders instead
   of shadows, short motion, no gradient, no secondary accent.
+- **Brand accent:** amber-600 `--accent` (#d97706), added 2026-10-18 on request.
 - **Type accent:** none.
 - **Motion accent:** none.
 
@@ -28,6 +29,7 @@ Every value traces to that recipe. Deviations, each one deliberate:
 | Inter Display / Inter / JetBrains Mono | Geist / Geist / Geist Mono | The Inter ban is active; Geist is the anchor's own family. |
 | Type scale 12…48 (9 sizes) | 12, 14, 16, 20, 24, 32, 48 | The token audit allows at most 7 sizes. |
 | Semantic red-600 | red-500 | red-600 is 4.1:1 on the dark background, below AA for text; red-500 is 5.3:1. Approved 2026-10-17. |
+| No secondary accent | `--accent`: amber-600 | Requested. Text and small marks: the active nav link, the current page in the sidebar and section in the index, links in articles, commands in code blocks. Never on the borders of blocks, never on large backgrounds or gradients. |
 | Card-free sections | Sidebar, reading column and on-page index | The documentation layout; one bordered level for code blocks and tables. |
 
 ## Active ban patterns
