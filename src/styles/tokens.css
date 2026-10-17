@@ -34,6 +34,11 @@
   --success: var(--emerald);
   --warning: var(--amber);
   --focus: var(--stone-50);
+  /* Brand accent: amber-600, 6.2:1 on --bg, so it may colour text as well as
+     fills. Never on the borders of blocks (cards, panels, tables, diagrams). */
+  --accent: var(--amber);
+  --accent-hover: color-mix(in srgb, var(--amber) 82%, var(--stone-50));
+  --on-accent: var(--stone-950);   /* 6.2:1 on --accent */
 
   /* ---- type ---- */
   --font-display: 'Geist', system-ui, sans-serif;
