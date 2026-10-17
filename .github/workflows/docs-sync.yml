@@ -28,3 +28,6 @@ jobs:
           title: 'docs: sync from jerboa engine'
           body: 'Regenerated documentation snapshot from AitorConS/jerboa docs.'
           branch: chore/docs-sync
+          add-paths: |
+            src/pages/*.md
+            src/data/docs.json
