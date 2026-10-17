@@ -9,6 +9,7 @@ const {
   title = 'jerboa documentation',
   description = 'How to install jerboa, build unikernel images and run them as Firecracker or QEMU VMs.',
 } = Astro.props;
+import '../styles/tokens.css';
 import '../styles/global.css';
 import { ClientRouter } from 'astro:transitions';
 
@@ -36,8 +37,7 @@ const jsonLd = {
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     <meta name="robots" content="index, follow" />
-    <meta name="theme-color" content="#f1eadd" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#110d0a" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#0c0a09" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="512x512" href="/favicon.png" />
@@ -66,7 +66,7 @@ const jsonLd = {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />

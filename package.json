@@ -10,7 +10,8 @@
     "docs:sync": "node scripts/sync-docs.mjs",
     "docs:check": "node scripts/sync-docs.mjs --check",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "lint:design": "node scripts/lint-design.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.4",
