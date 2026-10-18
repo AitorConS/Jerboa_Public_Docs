@@ -1,0 +1,100 @@
+/*
+ * Design tokens for jerboa.dev — the single source of truth (see DESIGN_RULES.md).
+ * Anchor: Linear / Vercel / Geist, dark only, balanced density.
+ * Every length, colour, duration and font used by the site must be one of these
+ * variables. `pnpm run lint:design` fails on literal values anywhere else.
+ */
+:root {
+  color-scheme: dark;
+
+  /* ---- colour: stone neutrals (Tailwind stone scale) ---- */
+  --stone-50: #fafaf9;
+  --stone-200: #e7e5e4;
+  --stone-400: #a8a29e;
+  --stone-500: #78716c;
+  --stone-800: #292524;
+  --stone-900: #1c1917;
+  --stone-950: #0c0a09;
+
+  /* ---- colour: semantic, one shade each ---- */
+  --red: #ef4444;      /* red-500: red-600 is 4.1:1 on --bg, below AA for text */
+  --emerald: #059669;  /* emerald-600 */
+  --amber: #d97706;    /* amber-600 */
+
+  /* ---- colour roles ---- */
+  --bg: var(--stone-950);
+  --surface: var(--stone-900);
+  --border: var(--stone-800);       /* elevation is a 1px border, never a shadow */
+  --text: var(--stone-50);
+  --text-muted: var(--stone-400);   /* 7.8:1 on --bg */
+  --graphic-muted: var(--stone-500); /* non-text only: 4.1:1 on --bg */
+  --primary: var(--stone-50);       /* primary action fill */
+  --on-primary: var(--stone-950);
+  --danger: var(--red);
+  --success: var(--emerald);
+  --warning: var(--amber);
+  --focus: var(--stone-50);
+  /* Brand accent: amber-600, 6.2:1 on --bg, so it may colour text as well as
+     fills. Never on the borders of blocks (cards, panels, tables, diagrams). */
+  --accent: var(--amber);
+  --accent-hover: color-mix(in srgb, var(--amber) 82%, var(--stone-50));
+  --on-accent: var(--stone-950);   /* 6.2:1 on --accent */
+
+  /* ---- type ---- */
+  --font-display: 'Geist', system-ui, sans-serif;
+  --font-sans: 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --text-12: 12px;
+  --text-14: 14px;
+  --text-16: 16px;
+  --text-20: 20px;
+  --text-24: 24px;
+  --text-32: 32px;
+  --text-48: 48px;
+  --leading-display: 1.1;
+  --leading-body: 1.5;
+  --tracking-display: -0.02em;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-display: 600;
+
+  /* ---- spacing: 4/8 grid ---- */
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-48: 48px;
+  --space-64: 64px;
+  --space-80: 80px;
+
+  /* ---- sizes ---- */
+  --hairline: 1px;
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --control-sm: 32px;
+  --control-md: 36px;
+  --control-lg: 44px;    /* minimum for tap targets */
+  --nav-height: 64px;
+  --container: 1200px;
+  --reading: 640px;
+
+  /* ---- radius: buttons never above --radius-md ---- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-full: 9999px;
+
+  /* ---- shadow: none; elevation is --border ---- */
+  --shadow: none;
+
+  /* ---- motion ---- */
+  --duration-hover: 60ms;
+  --duration-layout: 120ms;
+  --duration-modal: 180ms;
+  --ease-layout: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-hover: ease-out;
+}

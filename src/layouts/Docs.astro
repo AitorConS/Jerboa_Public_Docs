@@ -4,13 +4,46 @@ import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import docs from '../data/docs.json';
 import type { MarkdownLayoutProps } from 'astro';
-type Props = MarkdownLayoutProps<{ title: string; source: string }>;
-const { frontmatter } = Astro.props;
+type Props = MarkdownLayoutProps<{ title: string; description?: string; source: string }>;
+const { frontmatter, rawContent } = Astro.props;
+
+// The page's own description for search results: the first paragraph after
+// the title (plus its list when it ends in a colon, or the next paragraph when
+// it is short), stripped of Markdown and cut at a word near 155 characters.
+function describe(markdown: string): string {
+  const isList = (b: string) => /^\s*(?:[-*]|\d+\.)\s/.test(b);
+  const blocks = markdown
+    .replace(/^[\s\S]*?^# .*$/m, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .split(/\n\s*\n/)
+    .map((b) => b.trim())
+    .filter((b) => b && !/^(#|---|>|\||\{:)/.test(b));
+  const first = blocks.findIndex((b) => !isList(b));
+  if (first < 0) return `${frontmatter.title} in the jerboa documentation.`;
+  let text = blocks[first].replace(/\n/g, ' ');
+  const next = blocks[first + 1];
+  if (next && text.endsWith(':') && isList(next)) {
+    const items = next.split('\n').map((l) => l.replace(/^\s*(?:[-*]|\d+\.)\s+/, '').replace(/[.;]$/, '').trim()).filter(Boolean);
+    text = `${text} ${items.join('; ')}.`;
+  } else if (next && text.length < 70 && !isList(next)) {
+    text = `${text} ${next.replace(/\n/g, ' ')}`;
+  }
+  text = text
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[`*_]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (text.length <= 160) return text;
+  return `${text.slice(0, 155).replace(/\s+\S*$/, '').replace(/[,;:]$/, '')}…`;
+}
+// A description written in jerboa/docs wins; otherwise derive one.
+const description = frontmatter.description ?? describe(rawContent());
 const markdown = import.meta.glob('../pages/*.md', { eager: true });
 const groups = [
   { title: 'Start', slugs: ['getting-started', 'build-concepts'] },
   { title: 'Guides', slugs: ['macos-guide', 'compose', 'observability', 'troubleshooting'] },
-  { title: 'Reference', slugs: ['cli-reference', 'architecture'] },
+  { title: 'Reference', slugs: ['cli-reference', 'architecture', 'benchmarks', 'release-process'] },
   { title: 'macOS (advanced)', slugs: ['macos', 'macos-firecracker', 'packages-arm64', 'postgres-arm64', 'macos-snapshots', 'macos-shutdown', 'macos-stats', 'macos-distribution'] },
 ].map(group => ({ ...group, pages: group.slugs.map(slug => {
   const page = docs.pages.find(page => page.slug === slug)!;
@@ -18,12 +51,38 @@ const groups = [
   return { ...page, headings: module.getHeadings().filter(heading => heading.depth === 2) };
 }) }));
 const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.md` === frontmatter.source);
+const group = groups.find(g => g.pages.some(page => `${page.slug}.md` === frontmatter.source));
+const pageUrl = new URL(Astro.url.pathname, Astro.site).href;
+
+// schema.org: the page is a technical article about jerboa, inside a
+// Documentation > section > page trail.
+const structuredData = [
+  {
+    '@type': 'TechArticle',
+    '@id': `${pageUrl}#article`,
+    headline: frontmatter.title,
+    description,
+    url: pageUrl,
+    inLanguage: 'en',
+    isPartOf: { '@id': new URL('/#website', Astro.site).href },
+    about: { '@type': 'SoftwareApplication', '@id': 'https://jerboa.dev/#software', name: 'jerboa' },
+    version: docs.versions.cli,
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Documentation', item: new URL('/getting-started/', Astro.site).href },
+      ...(group ? [{ '@type': 'ListItem', position: 2, name: group.title }] : []),
+      { '@type': 'ListItem', position: group ? 3 : 2, name: frontmatter.title, item: pageUrl },
+    ],
+  },
+];
 ---
-<Base title={`jerboa — ${frontmatter.title}`}>
+<Base title={`${frontmatter.title} — jerboa docs`} description={description} ogType="article" structuredData={structuredData}>
   <Nav active="docs" />
   <div class="wrap docs-grid">
     <aside aria-label="Documentation navigation">
-      <p class="eyebrow">Documentation · v{docs.versions.cli}</p>
+      <p class="eyebrow">Documentation · <span translate="no">v{docs.versions.cli}</span></p>
       <nav class="doc-tree" aria-label="Guides">
         {groups.map(group => {
           const hasCurrent = group.pages.some(page => `${page.slug}.md` === frontmatter.source);
@@ -43,7 +102,7 @@ const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.
         })}
       </nav>
     </aside>
-    <main class="doc-main">
+    <main class="doc-main" id="main">
       <slot />
     </main>
     {current && current.headings.length > 0 && (
@@ -85,7 +144,7 @@ const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.
         links.forEach((l) => l.removeAttribute('aria-current'));
         byId.get((entry.target as HTMLElement).id)?.setAttribute('aria-current', 'true');
       }
-    }, { rootMargin: '-90px 0px -70% 0px' });
+    }, { rootMargin: '-12% 0% -70% 0%' });
     document.querySelectorAll('.doc-main h2[id]').forEach((h) => observer.observe(h));
     (window as any).__tocObserver = observer;
   };
@@ -95,85 +154,82 @@ const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.
 </script>
 </Base>
 <style>
-  /* Docs override the global no-smooth-scroll rule: article changes and
-     in-page anchors scroll smoothly instead of jumping to the top. */
+  /* Docs override the global no-smooth-scroll rule: in-page anchors scroll
+     smoothly instead of jumping. */
   html { scroll-behavior: smooth; }
-  @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-  }
-  .docs-grid { display: grid; grid-template-columns: 240px minmax(0, 1fr) 200px; align-items: start; gap: 48px; padding-top: 40px; padding-bottom: 80px; }
-  aside { position: sticky; top: 88px; max-height: calc(100dvh / 1.25 - 110px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 34%, transparent) transparent; }
-  aside::-webkit-scrollbar { width: 9px; }
-  aside::-webkit-scrollbar-track { background: transparent; }
-  aside::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 34%, transparent); border-radius: 9px; border: 2px solid transparent; background-clip: padding-box; }
-  aside:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 55%, transparent); background-clip: padding-box; }
-  aside::-webkit-scrollbar-thumb:hover { background: var(--accent); background-clip: padding-box; }
-  .eyebrow { font-family: 'Geist Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 12px; }
-  .doc-tree { font-size: 14px; }
-  .doc-tree summary { display: flex; align-items: baseline; gap: 10px; list-style: none; cursor: pointer; padding: 5px 0; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  .docs-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr); gap: var(--space-48); align-items: start; padding-top: var(--space-40); padding-bottom: var(--space-80); }
+  aside, .toc { position: sticky; top: calc(var(--nav-height) + var(--space-24)); max-height: calc(100dvh - var(--nav-height) - var(--space-48)); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .eyebrow { font: var(--weight-medium) var(--text-12) / var(--leading-body) var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: var(--space-12); }
+
+  /* ===== sidebar tree ===== */
+  .doc-tree { font-size: var(--text-14); }
+  .doc-tree summary { display: flex; align-items: center; gap: var(--space-8); min-height: var(--control-lg); list-style: none; cursor: pointer; font-weight: var(--weight-medium); color: var(--text); }
   .doc-tree summary::-webkit-details-marker { display: none; }
-  .doc-tree summary::before { content: ''; flex: 0 0 5px; width: 5px; height: 5px; border-right: 1px solid var(--muted); border-bottom: 1px solid var(--muted); transform: rotate(-45deg); position: relative; top: -2px; }
+  .doc-tree summary::before { content: ''; width: var(--space-4); height: var(--space-4); border-right: var(--hairline) solid var(--text-muted); border-bottom: var(--hairline) solid var(--text-muted); transform: rotate(-45deg); transition: transform var(--duration-layout) var(--ease-layout); }
   .doc-tree details[open] > summary::before { transform: rotate(45deg); }
-  .tree-group { margin-bottom: 4px; }
-  .tree-group > summary { font-weight: 600; }
-  .tree-children { border-left: 1px solid var(--border); margin: 4px 0 4px 2px; padding-left: 17px; }
-  .doc-tree a { display: block; color: var(--ink); padding: 3px 7px; border-radius: 4px; line-height: 1.45; }
-  .toc { position: sticky; top: 88px; max-height: calc(100dvh / 1.25 - 110px); overflow-y: auto; font-size: 13px; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 34%, transparent) transparent; }
-  .toc ul { list-style: none; border-left: 1px solid var(--border); padding-left: 16px; }
-  .toc a { display: block; color: var(--muted); padding: 3px 0; line-height: 1.5; }
-  .toc a:hover { color: var(--ink); }
-  .toc a[aria-current='true'] { color: var(--accent); font-weight: 500; }
-  .toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  /* Smooth expand/collapse for categories (same feel as the smooth
-     scrolling). Grid-rows trick; instant fallback with reduced motion
-     or where ::details-content is unsupported. */
-  @media (prefers-reduced-motion: no-preference) {
-    .doc-tree summary::before { transition: transform .2s ease; }
-    @supports selector(details::details-content) {
-      details.tree-group::details-content { content-visibility: visible; }
-      .tree-group > .tree-children {
-        display: grid;
-        grid-template-rows: 1fr;
-        opacity: 1;
-        transition: grid-template-rows .25s ease, opacity .2s ease, margin-top .25s ease, margin-bottom .25s ease, visibility 0s;
-      }
-      .tree-group:not([open]) > .tree-children {
-        display: grid;
-        grid-template-rows: 0fr;
-        opacity: 0;
-        visibility: hidden;
-        margin-top: 0;
-        margin-bottom: 0;
-        transition: grid-template-rows .25s ease, opacity .2s ease, margin-top .25s ease, margin-bottom .25s ease, visibility 0s .25s;
-      }
-      .tree-group > .tree-children > * { min-height: 0; overflow: hidden; }
-    }
+  .tree-children { border-left: var(--hairline) solid var(--border); margin-left: var(--space-4); }
+  .doc-tree a { display: flex; align-items: center; min-height: var(--control-lg); margin-left: calc(-1 * var(--hairline)); padding: 0 var(--space-12); border-left: var(--hairline) solid transparent; color: var(--text-muted); transition: color var(--duration-hover) var(--ease-hover), border-color var(--duration-hover) var(--ease-hover); }
+  .doc-tree a:hover { color: var(--text); }
+  .doc-tree a[aria-current] { color: var(--accent); border-left-color: var(--text); }
+
+  /* ===== on this page ===== */
+  .toc { font-size: var(--text-14); }
+  .toc ul { list-style: none; border-left: var(--hairline) solid var(--border); }
+  .toc a { display: flex; align-items: center; min-height: var(--control-lg); margin-left: calc(-1 * var(--hairline)); padding: 0 var(--space-12); border-left: var(--hairline) solid transparent; color: var(--text-muted); transition: color var(--duration-hover) var(--ease-hover), border-color var(--duration-hover) var(--ease-hover); }
+  .toc a:hover { color: var(--text); }
+  .toc a[aria-current='true'] { color: var(--accent); border-left-color: var(--text); }
+
+  /* ===== article ===== */
+  .doc-main { min-width: 0; max-width: var(--reading); font-size: var(--text-16); line-height: var(--leading-body); overflow-wrap: anywhere; }
+  .doc-main :global(h1), .doc-main :global(h2), .doc-main :global(h3) { font-family: var(--font-display); font-weight: var(--weight-display); line-height: var(--leading-display); letter-spacing: var(--tracking-display); text-wrap: balance; }
+  .doc-main :global(h1) { font-size: var(--text-48); margin-bottom: var(--space-32); }
+  .doc-main :global(h2) { font-size: var(--text-24); margin: var(--space-64) 0 var(--space-16); padding-top: var(--space-32); border-top: var(--hairline) solid var(--border); }
+  .doc-main :global(h3) { font-size: var(--text-16); margin: var(--space-32) 0 var(--space-12); }
+  /* The synced pages put a rule under the title and between sections; the
+     section border replaces them. */
+  .doc-main :global(h1 + hr), .doc-main :global(hr:has(+ h2)) { display: none; }
+  .doc-main :global(h1 + hr + h2), .doc-main :global(h1 + h2) { margin-top: 0; padding-top: 0; border-top: 0; }
+  .doc-main :global(p), .doc-main :global(ul), .doc-main :global(ol), .doc-main :global(pre), .doc-main :global(table), .doc-main :global(blockquote) { margin-bottom: var(--space-16); }
+  .doc-main :global(p), .doc-main :global(li) { color: var(--stone-200); }
+  .doc-main :global(ul), .doc-main :global(ol) { padding-left: var(--space-24); }
+  .doc-main :global(li + li) { margin-top: var(--space-4); }
+  .doc-main :global(strong) { color: var(--text); font-weight: var(--weight-display); }
+  .doc-main :global(a) { color: var(--accent); text-decoration: underline; text-decoration-color: var(--graphic-muted); text-underline-offset: 0.25em; transition: text-decoration-color var(--duration-hover) var(--ease-hover); }
+  .doc-main :global(a:hover) { text-decoration-color: var(--accent); }
+  .doc-main :global(code) { font-family: var(--font-mono); font-size: var(--text-14); }
+  .doc-main :global(:not(pre) > code) { padding: 0 var(--space-4); border: var(--hairline) solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); }
+  /* Shiki's css-variables theme, mapped onto the stone tokens: monochrome,
+     with emphasis by lightness only. */
+  :global(:root) {
+    --astro-code-foreground: var(--stone-200);
+    --astro-code-background: var(--surface);
+    --astro-code-token-keyword: var(--text);
+    --astro-code-token-function: var(--accent);   /* commands such as jerboa, sudo, curl */
+    --astro-code-token-constant: var(--stone-200);
+    --astro-code-token-parameter: var(--stone-200);
+    --astro-code-token-string: var(--stone-400);
+    --astro-code-token-string-expression: var(--stone-400);
+    --astro-code-token-comment: var(--text-muted);
+    --astro-code-token-punctuation: var(--text-muted);
+    --astro-code-token-link: var(--text);
   }
-  .doc-tree a:hover, .doc-tree a[aria-current] { background: var(--surface); color: var(--ink); }
-  .doc-tree a[aria-current] { font-weight: 500; }
-  .doc-tree summary:focus-visible, .doc-tree a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .doc-main { min-width: 0; line-height: 1.75; overflow-wrap: anywhere; }
-  .doc-main :global(h1) { font-family: 'Newsreader', serif; font-size: clamp(36px, 5vw, 56px); line-height: 1.15; font-weight: 300; margin-bottom: 24px; }
-  .doc-main :global(h2) { margin: 36px 0 16px; font-size: 26px; }
-  .doc-main :global(h3) { margin: 26px 0 12px; font-size: 19px; }
-  .doc-main :global(h2, h3, h4) { scroll-margin-top: 100px; }
-  .doc-main :global(p, ul, ol, pre, table, blockquote) { margin-bottom: 18px; }
-  .doc-main :global(ul, ol) { padding-left: 24px; }
-  .doc-main :global(a) { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-  .doc-main :global(code) { font-family: 'Geist Mono', monospace; font-size: .85em; }
-  .doc-main :global(:not(pre) > code) { background: var(--surface); padding: 2px 5px; border-radius: 4px; }
-  .doc-main :global(pre) { padding: 20px; border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
-  .doc-main :global(table) { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
-  .doc-main :global(th, td) { border: 1px solid var(--border); padding: 10px 14px; text-align: left; }
-  .doc-main :global(th) { background: var(--surface); }
-  .doc-main :global(blockquote) { border-left: 3px solid var(--accent); padding-left: 18px; color: var(--muted); }
-  .doc-main :global(hr) { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
-  @media (max-width: 1100px) {
-    .docs-grid { grid-template-columns: 240px minmax(0, 1fr); gap: 48px; }
+  /* Shiki writes its own background inline; the surface token wins. */
+  .doc-main :global(pre) { padding: var(--space-16); border: var(--hairline) solid var(--border); border-radius: var(--radius-lg); background: var(--surface) !important; white-space: pre-wrap; font-size: var(--text-14); line-height: var(--leading-body); }
+  .doc-main :global(table) { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-14); font-variant-numeric: tabular-nums; }
+  .doc-main :global(th), .doc-main :global(td) { padding: var(--space-12) var(--space-12) var(--space-12) 0; border-bottom: var(--hairline) solid var(--border); text-align: left; vertical-align: top; }
+  .doc-main :global(th) { font: var(--weight-medium) var(--text-12) / var(--leading-body) var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  .doc-main :global(blockquote) { padding-left: var(--space-16); border-left: var(--focus-width) solid var(--border); color: var(--text-muted); }
+  .doc-main :global(hr) { border: 0; border-top: var(--hairline) solid var(--border); margin: var(--space-32) 0; }
+
+  @media (max-width: 70em) {
+    .docs-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 3fr); }
     .toc { display: none; }
   }
-  @media (max-width: 800px) {
-    .docs-grid { grid-template-columns: 1fr; gap: 28px; }
+  @media (max-width: 54em) {
+    .docs-grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-24); padding-top: var(--space-24); }
     aside { position: static; max-height: none; }
+    .doc-main :global(h1) { font-size: var(--text-32); }
   }
 </style>
