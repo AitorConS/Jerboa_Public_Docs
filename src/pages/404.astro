@@ -1,0 +1,28 @@
+---
+import Base from '../layouts/Base.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Base title="Page not found — jerboa docs" description="This documentation page does not exist." noindex>
+  <Nav active="docs" />
+  <main id="main" class="wrap missing">
+    <p class="eyebrow">404</p>
+    <h1>That page doesn’t exist.</h1>
+    <p class="lede">It may have moved or been renamed. Every page is listed in the sidebar of Getting Started.</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="/getting-started/">Open Getting Started</a>
+      <a class="btn" href="https://jerboa.dev/">Go to jerboa.dev</a>
+    </div>
+  </main>
+  <Footer />
+</Base>
+
+<style>
+  .missing { padding-top: var(--space-80); padding-bottom: var(--space-80); }
+  .missing > * + * { margin-top: var(--space-16); }
+  .eyebrow { font: var(--weight-medium) var(--text-12) / var(--leading-body) var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  h1 { font-family: var(--font-display); font-size: var(--text-48); font-weight: var(--weight-display); line-height: var(--leading-display); letter-spacing: var(--tracking-display); text-wrap: balance; }
+  .actions { display: flex; flex-wrap: wrap; gap: var(--space-8); padding-top: var(--space-8); }
+  @media (max-width: 54em) { h1 { font-size: var(--text-32); } }
+</style>

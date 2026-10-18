@@ -33,6 +33,8 @@ for (const file of files) {
   if (!match) continue; // no frontmatter: a working note, not a site page
   const title = match[1].match(/^title:\s*(.+)$/m)?.[1];
   const order = Number(match[1].match(/^nav_order:\s*(\d+)$/m)?.[1]);
+  // Optional: the search-result description written in jerboa/docs.
+  const description = match[1].match(/^description:\s*(.+)$/m)?.[1]?.replace(/^(["'])(.*)\1$/, '$2');
   if (!title || !order) throw new Error(`Missing navigation metadata: ${file}`);
   const slug = file.slice(0, -3);
   const url = `/${slug}/`;
@@ -47,7 +49,7 @@ for (const file of files) {
     .replace(/\{:[^}\n]*\}/g, '')
     .replace(/^\[View on GitHub\]\(https:\/\/github\.com\/AitorConS\/jerboa\)[ \t]*\r?\n/gm, '');
   if (/\{%|\{\{\s*site\./.test(body)) throw new Error(`Unconverted Jekyll syntax: ${file}`);
-  outputs.set(path.join(destination, file), `---\nlayout: ../layouts/Docs.astro\ntitle: ${JSON.stringify(title)}\nsource: ${JSON.stringify(file)}\n---\n${marker}\n${body.trim()}\n`);
+  outputs.set(path.join(destination, file), `---\nlayout: ../layouts/Docs.astro\ntitle: ${JSON.stringify(title)}\n${description ? `description: ${JSON.stringify(description)}\n` : ''}source: ${JSON.stringify(file)}\n---\n${marker}\n${body.trim()}\n`);
 }
 pages.sort((a, b) => a.order - b.order);
 outputs.set(path.join(root, 'src/data/docs.json'), JSON.stringify({ versions, pages }, null, 2) + '\n');

@@ -3,9 +3,18 @@ export interface Props {
   transitions?: boolean;
   title?: string;
   description?: string;
+  /** `article` for documentation pages. */
+  ogType?: 'website' | 'article';
+  /** Extra schema.org nodes for this page, added to the site's JSON-LD graph. */
+  structuredData?: Record<string, unknown>[];
+  /** Keep the page out of search results (e.g. the 404 page). */
+  noindex?: boolean;
 }
 const {
   transitions = true,
+  ogType = 'website',
+  structuredData = [],
+  noindex = false,
   title = 'jerboa documentation',
   description = 'How to install jerboa, build unikernel images and run them as Firecracker or QEMU VMs.',
 } = Astro.props;
@@ -13,16 +22,22 @@ import '../styles/tokens.css';
 import '../styles/global.css';
 import { ClientRouter } from 'astro:transitions';
 
-// Absolute URLs for canonical + social cards (Astro.site is https://jerboa.dev).
+// Absolute URLs for canonical + social cards (Astro.site is https://docs.jerboa.dev).
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const ogImage = new URL('/og.png', Astro.site).href;
 
 const jsonLd = {
   '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: 'jerboa',
-  url: Astro.site?.href,
-  description,
+  '@graph': [
+    {
+      '@type': 'WebSite',
+      '@id': new URL('/#website', Astro.site).href,
+      name: 'jerboa documentation',
+      url: Astro.site?.href,
+      inLanguage: 'en',
+    },
+    ...structuredData,
+  ],
 };
 ---
 
@@ -36,7 +51,8 @@ const jsonLd = {
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <meta name="robots" content="index, follow" />
+    <meta name="robots" content={noindex ? 'noindex, follow' : 'index, follow'} />
+    <link rel="sitemap" type="application/xml" href="/sitemap-index.xml" />
     <meta name="theme-color" content="#0c0a09" />
 
     <!-- Favicon -->
@@ -44,7 +60,7 @@ const jsonLd = {
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
     <!-- Open Graph -->
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:site_name" content="jerboa" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />

@@ -4,13 +4,46 @@ import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import docs from '../data/docs.json';
 import type { MarkdownLayoutProps } from 'astro';
-type Props = MarkdownLayoutProps<{ title: string; source: string }>;
-const { frontmatter } = Astro.props;
+type Props = MarkdownLayoutProps<{ title: string; description?: string; source: string }>;
+const { frontmatter, rawContent } = Astro.props;
+
+// The page's own description for search results: the first paragraph after
+// the title (plus its list when it ends in a colon, or the next paragraph when
+// it is short), stripped of Markdown and cut at a word near 155 characters.
+function describe(markdown: string): string {
+  const isList = (b: string) => /^\s*(?:[-*]|\d+\.)\s/.test(b);
+  const blocks = markdown
+    .replace(/^[\s\S]*?^# .*$/m, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .split(/\n\s*\n/)
+    .map((b) => b.trim())
+    .filter((b) => b && !/^(#|---|>|\||\{:)/.test(b));
+  const first = blocks.findIndex((b) => !isList(b));
+  if (first < 0) return `${frontmatter.title} in the jerboa documentation.`;
+  let text = blocks[first].replace(/\n/g, ' ');
+  const next = blocks[first + 1];
+  if (next && text.endsWith(':') && isList(next)) {
+    const items = next.split('\n').map((l) => l.replace(/^\s*(?:[-*]|\d+\.)\s+/, '').replace(/[.;]$/, '').trim()).filter(Boolean);
+    text = `${text} ${items.join('; ')}.`;
+  } else if (next && text.length < 70 && !isList(next)) {
+    text = `${text} ${next.replace(/\n/g, ' ')}`;
+  }
+  text = text
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[`*_]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (text.length <= 160) return text;
+  return `${text.slice(0, 155).replace(/\s+\S*$/, '').replace(/[,;:]$/, '')}…`;
+}
+// A description written in jerboa/docs wins; otherwise derive one.
+const description = frontmatter.description ?? describe(rawContent());
 const markdown = import.meta.glob('../pages/*.md', { eager: true });
 const groups = [
   { title: 'Start', slugs: ['getting-started', 'build-concepts'] },
   { title: 'Guides', slugs: ['macos-guide', 'compose', 'observability', 'troubleshooting'] },
-  { title: 'Reference', slugs: ['cli-reference', 'architecture'] },
+  { title: 'Reference', slugs: ['cli-reference', 'architecture', 'benchmarks', 'release-process'] },
   { title: 'macOS (advanced)', slugs: ['macos', 'macos-firecracker', 'packages-arm64', 'postgres-arm64', 'macos-snapshots', 'macos-shutdown', 'macos-stats', 'macos-distribution'] },
 ].map(group => ({ ...group, pages: group.slugs.map(slug => {
   const page = docs.pages.find(page => page.slug === slug)!;
@@ -18,8 +51,34 @@ const groups = [
   return { ...page, headings: module.getHeadings().filter(heading => heading.depth === 2) };
 }) }));
 const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.md` === frontmatter.source);
+const group = groups.find(g => g.pages.some(page => `${page.slug}.md` === frontmatter.source));
+const pageUrl = new URL(Astro.url.pathname, Astro.site).href;
+
+// schema.org: the page is a technical article about jerboa, inside a
+// Documentation > section > page trail.
+const structuredData = [
+  {
+    '@type': 'TechArticle',
+    '@id': `${pageUrl}#article`,
+    headline: frontmatter.title,
+    description,
+    url: pageUrl,
+    inLanguage: 'en',
+    isPartOf: { '@id': new URL('/#website', Astro.site).href },
+    about: { '@type': 'SoftwareApplication', '@id': 'https://jerboa.dev/#software', name: 'jerboa' },
+    version: docs.versions.cli,
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Documentation', item: new URL('/getting-started/', Astro.site).href },
+      ...(group ? [{ '@type': 'ListItem', position: 2, name: group.title }] : []),
+      { '@type': 'ListItem', position: group ? 3 : 2, name: frontmatter.title, item: pageUrl },
+    ],
+  },
+];
 ---
-<Base title={`jerboa — ${frontmatter.title}`}>
+<Base title={`${frontmatter.title} — jerboa docs`} description={description} ogType="article" structuredData={structuredData}>
   <Nav active="docs" />
   <div class="wrap docs-grid">
     <aside aria-label="Documentation navigation">
