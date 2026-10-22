@@ -160,6 +160,15 @@ when no new Linux kernel is intended. Reusing a kernel version with different
 bytes, or promoting a lower kernel version, is rejected before changing stable.
 Retries with identical published bytes remain safe.
 
+A source-built kernel also publishes its host tools: `kernel/<v>/mkfs-linux-arm64`
+(built on `ubuntu-24.04-arm` by `kernel-tools-arm64`), `kernel/<v>/mkfs-darwin-arm64`
+(from `build-macos`) and `kernel/<v>/toolset.json`, signed with the release key,
+which lists the mkfs for every host including the kernel's own `mkfs-linux-amd64`.
+Image recipes name a toolset version, and clients assembling one fetch that
+version's mkfs through this document (`tools.MkfsForVersion`). Assembly checks the
+binaries' headers match their platforms. A reused kernel already shipped these
+files with its first release.
+
 The `kvm` runner needs `cc` with static libc support, QEMU x86_64, Firecracker and
 read/write access to `/dev/kvm`. The boot job uses isolated disks, records both
 hypervisor versions and console-log hashes, and fails on timeout, non-successful
@@ -199,3 +208,12 @@ the release, including the daemon service capabilities needed for guest DNS.
 Promotion never substitutes the installer from its own checkout. Retrying a
 legacy candidate without a tracked installer leaves the bootstrap alias alone;
 publish a new candidate to update it.
+
+## Image registry operations
+
+The image registry (`registry.jerboa.dev`, [user guide](/registry/),
+[protocol](/registry-protocol/)) server and its operations live in
+a private repository. The Go client and the protocol stay here; the server's
+CI runs this repository's `tests/registry` end to end on every change and
+daily against `main`, so a client change that breaks the protocol fails there
+within a day.
