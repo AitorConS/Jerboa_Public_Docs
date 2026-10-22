@@ -198,7 +198,7 @@ Key flags:
 | `-f, --file` | Path to the `unikernel.toml` to use (default: `<path>/unikernel.toml`) |
 | `--no-preflight` | Skip the pre-build binary checks (ELF class/arch, shared-library closure, entrypoint presence) |
 | `--size-report[=text\|json]` | Before assembling, print what the image will contain grouped by program, runtime package, npm module, Python distribution and top-level project path. `json` prints every group to stdout (the build summary then goes to stderr) |
-| `--layout` | Disk image layout: `standard` (default; boots on every hypervisor) or `compact` (no boot code and no boot filesystem copy of the kernel; about 3–4 MiB smaller, boots only on Firecracker and native ARM64 QEMU on macOS). An explicit flag overrides `[build] layout` |
+| `--layout` | Disk image layout: `compact` (default; no boot code and no boot filesystem copy of the kernel, which the hypervisor loads itself: Firecracker, native ARM64 QEMU on macOS, and QEMU with KVM through PVH on Linux) or `standard` (BIOS boot code, needed for x86 emulation on macOS and for QEMU without KVM). x86 images built on macOS default to `standard`. An explicit flag overrides `[build] layout` |
 | `--smoke` | Boot the image once after building, scan serial output for known failure signatures, then stop and remove the test VM |
 
 `unikernel.toml` is read automatically when present, or selected explicitly with
@@ -211,9 +211,9 @@ Key flags:
 | `run` | Shell commands to run before packaging (like a Dockerfile `RUN`) |
 | `pkgs` | Packages to include (e.g. `["eyberg/postgresql:11.3.0"]`); `--pkg` flags append to this list |
 | `pkg_source` | Package source: `ops` (default) or `jerboa`; an explicit `--pkg-source` flag wins |
-| `disk_size` | Minimum image size (e.g. `512M`, `1G`) for runtime scratch space |
-| `layout` | `standard` (default) or `compact`; see `--layout` |
-| `include` | Allowlist of project paths to package for `node`, `python` and `raw` builds (e.g. `["server.js", "lib", "node_modules", "**/*.json"]`). Paths are relative to the project root; `*` matches within a path segment, `**` across segments, and a directory matches everything below it. It only narrows what `.unignore` lets through — re-include ignored defaults such as `node_modules` with `!node_modules` in `.unignore`. Python builds must list `packages` (pip dependencies). The build fails if the entrypoint is not included |
+| `disk_size` | Boot disk size each VM gets (e.g. `512M`, `1G`) for runtime scratch space. It is stored in the image manifest and applied when the VM starts; the image itself holds only its contents |
+| `layout` | `compact` (default) or `standard`; see `--layout` |
+| `include` | Allowlist of project paths to package for `node`, `python` and `raw` builds (e.g. `["server.js", "lib", "node_modules", "**/*.json"]`). Paths are relative to the project root; `*` matches within a path segment, `**` across segments, and a directory matches everything below it. It only narrows what `.unignore` lets through. Node builds package `node_modules` (the production dependencies the driver installs); other languages ignore it by default, and `.unignore` can exclude it explicitly. Python builds must list `packages` (pip dependencies). The build fails if the entrypoint is not included |
 | `dirs` | Absolute directories to create empty in the image — volume mount points (a volume can only mount onto a directory that already exists in the image) and runtime scratch paths |
 
 For `lang = "raw"`, `[program] path` names the runtime binary resolved from
@@ -312,6 +312,35 @@ the VM only if the digest matches.
 
 ---
 
+## Registry Commands
+
+Images move between machines through an image registry, by default
+`registry.jerboa.dev`. A push uploads the image's **recipe** and only the files
+the registry does not already have; a pull fetches the files the daemon lacks
+and assembles the disk locally with the recipe's pinned `mkfs`, then verifies it
+byte-for-byte. See the [registry protocol](/registry-protocol/).
+
+| Command | Description |
+|---|---|
+| `login [registry]` | Log in with GitHub (device flow: approve the code shown in a browser). `--token <pat>`, or `JERBOA_REGISTRY_TOKEN`, uses a personal access token instead, as CI does |
+| `logout [registry]` | Forget the stored credential |
+| `tag <image> <target>` | Give a stored image another name, e.g. the reference to push it as |
+| `push <[registry/]namespace/repository[:tag]>` | Push a tagged image; you may push to your GitHub user and to organizations you belong to |
+| `pull <[registry/]namespace/repository[:tag\|@digest]>` | Pull an image into the daemon's store |
+| `registry pat create\|ls\|rm` | Manage personal access tokens for CI (`--registry` selects the host) |
+
+```sh
+jerboa build . --name web
+jerboa tag web:latest aitorcons/web:v1
+jerboa login
+jerboa push aitorcons/web:v1
+jerboa pull aitorcons/web:v1   # on another machine
+jerboa run aitorcons/web:v1
+```
+
+Credentials live in `~/.jerboa/credentials.json` (mode 0600) and stay with the
+CLI: the daemon only receives a 15-minute push token per push.
+
 ## Package Commands
 
 `jerboa pkg` manages runtime packages used during builds.
@@ -365,12 +394,28 @@ jerboa build . --name redis
 - `--missing-files` — report static dependency analysis; missing dependencies fail creation.
 - `--sysroot <dir>` — resolve the loader and libraries within this rootfs, preserving guest paths.
 
+`pkg create` resolves the libraries of the program and of every ELF passed
+with `--map` or `--libs`. The archive is reproducible (sorted entries, root
+ownership, modes 0755/0644, timestamps from `SOURCE_DATE_EPOCH`), and the
+package records a `content_digest` of its files that images keep in their
+package references. Build-time Python files (`test`, `idlelib`, `tkinter`,
+`ensurepip`, `config-*` and similar, and optimized `.pyc`) are left out. See
+[Package recipes](/package-recipes/).
+
 `pkg from-docker` and selection operations also accept `--platform`. Docker
 imports record the requested reference, immutable image ID and available repository
 digest. Local variants coexist and take precedence over the remote index.
 `jerboa images inspect <ref>` displays image platform and integrated package
 versions, hashes and provenance. See [ARM64 package workflow](/packages-arm64/)
 for local sysroots, compatibility rules and reproducible Firecracker acceptance.
+
+Every build is also recorded as a **recipe**: the mkfs manifest with each file
+replaced by its SHA-256, the pinned kernel toolset version, and the expected disk
+digest. The files themselves are kept once each in the daemon's blob store
+(`~/.jerboa/blobs`). A recipe rebuilds the same disk byte-for-byte on any host, which
+is how registry pushes and pulls will transfer images. `jerboa images inspect`
+shows the recipe digest and `jerboa images recipe <ref>` prints the recipe.
+Images whose toolset has no version marker are built without one.
 
 `pkg load` uses the root command's endpoint and authentication configuration,
 including `--host` and `JERBOA_HOST`. Use `--source jerboa` for local packages.
@@ -670,11 +715,16 @@ Root commands currently exposed by the built CLI:
 - `init`
 - `inspect`
 - `kernel`
+- `login`
+- `logout`
 - `logs`
 - `network`
 - `node`
 - `pkg`
 - `ps`
+- `pull`
+- `push`
+- `registry`
 - `rm`
 - `rmi`
 - `run`
@@ -682,6 +732,7 @@ Root commands currently exposed by the built CLI:
 - `stats`
 - `status`
 - `stop`
+- `tag`
 - `verify`
 - `version`
 - `volume`
