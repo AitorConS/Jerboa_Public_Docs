@@ -101,7 +101,7 @@ force it with `--lang` / `[build] lang`:
 |---|---|---|
 | `go` | `go.mod` | `go build` with `CGO_ENABLED=0`, `GOOS=linux`, `-trimpath`, stripped symbols → static ELF |
 | `rust` | `Cargo.toml` | `cargo build --release --target x86_64-unknown-linux-musl` → static ELF (install the target once: `rustup target add x86_64-unknown-linux-musl`) |
-| `node` | `package.json` | Install production dependencies when manifests, lockfiles, runtime or platform change, or `node_modules/` is absent; ships your sources plus the Node runtime package (version from `engines.node`, default 20) |
+| `node` | `package.json` | Install production dependencies when manifests, lockfiles, runtime or platform change, or `node_modules/` is absent; ships your sources, `node_modules` (without its `.bin` launchers) and the Node runtime package (version from `engines.node`, default 20). Symlinks to files inside the project are packaged with their target's content |
 | `python` | `pyproject.toml` or `requirements.txt` | `pip install` into `packages/` as **Linux x86_64 wheels** (whatever your host OS is); ships sources plus the Python runtime package (version from `requires-python`, default 3.12); sets `PYTHONPATH=/packages` |
 | `raw` | never auto-detected | no compilation; the program comes from a package (see below) |
 
@@ -208,8 +208,11 @@ the program writes at runtime (logs, temp files, a database), reserve room:
 
 ```toml
 [build]
-disk_size = "1G"    # minimum image size; the rest is free space
+disk_size = "1G"    # boot disk size; the rest is free space
 ```
+
+The image itself stays the size of its contents: `disk_size` is recorded in the
+image and each VM's private boot disk is extended to it when the VM starts.
 
 And every directory the program writes to must **exist in the image**:
 
@@ -326,12 +329,16 @@ run = ["npm run build"]  # shell commands before packaging (Dockerfile RUN analo
                          # these run on the BUILD machine, which has a shell — the guest does not)
 pkgs = []                # packages to include (e.g. ["eyberg/postgresql:11.3.0"])
 pkg_source = "ops"       # "ops" (default) or "jerboa"
-disk_size = "1G"         # minimum image size (free space for runtime writes)
-layout = "standard"      # "standard" (every hypervisor) or "compact" (Firecracker and
-                         # native ARM64 QEMU only: no boot code or boot filesystem)
+disk_size = "1G"         # boot disk size each VM gets (free space for runtime writes);
+                         # the stored image holds only its contents
+layout = "compact"       # "compact" (default: the hypervisor loads the kernel) or
+                         # "standard" (BIOS boot code: x86 emulation, QEMU without KVM)
 include = ["server.js", "lib", "node_modules"]  # optional allowlist of project paths
                          # (node/python/raw); `jerboa build --size-report` shows what is left
 dirs = ["/data"]         # empty directories to create (mount points, scratch paths)
+install_scripts = false  # let npm run dependencies' install scripts (off by default)
+sandbox = true           # confine build steps on the build machine (default true)
+network = false          # let `run` commands reach the network (off by default)
 
 [program]                # raw builds only
 path = "/usr/local/pgsql/bin/postgres"  # full in-image path of the program
@@ -345,7 +352,9 @@ KEY = "value"
 [run]                    # defaults inherited by `jerboa run` (flag > [run] > built-in)
 memory = "512M"
 cpus = 1
-ports = ["5432:5432"]    # applied when the VM joins a --network and no -p is given
+ports = ["5432:5432"]    # applied when the VM joins a --network and no -p is given;
+                         # always published on 127.0.0.1 (a bind address here is
+                         # ignored); `-p` overrides them
 
 [[stages]]               # optional multi-stage builds
 name = "frontend"

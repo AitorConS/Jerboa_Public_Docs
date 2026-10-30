@@ -83,6 +83,7 @@ Key flags:
 | `--rm` | Auto-remove after stop |
 | `-v, --volume` | Named volume mount `name:path[:ro]` |
 | `--attach` | Stream serial console and block |
+| `--raw` | With `--attach`, keep terminal control sequences in the console output |
 | `-d, --detach` | Detached mode, default `true` |
 | `--network` | Managed network name |
 | `--ip` | Static guest IP, requires `--network`; omitted, the daemon allocates one from the network's subnet |
@@ -129,9 +130,12 @@ Summary view of daemon-side VM counts and restart/health state.
 
 Print buffered serial console output.
 
-Flag:
+Flags:
 
 - `-f, --follow`: poll and stream appended output until the VM stops
+- `--raw`: print the output unfiltered. By default terminal control sequences
+  (colors, cursor movement, window titles) are removed from guest output, as
+  with `jerboa run --attach`, which also takes `--raw`
 
 When the output contains a known Nanos failure signature (`popen failure`,
 `error loading shared library`, `no space left on device`, …), an explanation
@@ -198,7 +202,7 @@ Key flags:
 | `-f, --file` | Path to the `unikernel.toml` to use (default: `<path>/unikernel.toml`) |
 | `--no-preflight` | Skip the pre-build binary checks (ELF class/arch, shared-library closure, entrypoint presence) |
 | `--size-report[=text\|json]` | Before assembling, print what the image will contain grouped by program, runtime package, npm module, Python distribution and top-level project path. `json` prints every group to stdout (the build summary then goes to stderr) |
-| `--layout` | Disk image layout: `standard` (default; boots on every hypervisor) or `compact` (no boot code and no boot filesystem copy of the kernel; about 3–4 MiB smaller, boots only on Firecracker and native ARM64 QEMU on macOS). An explicit flag overrides `[build] layout` |
+| `--layout` | Disk image layout: `compact` (default; no boot code and no boot filesystem copy of the kernel, which the hypervisor loads itself: Firecracker, native ARM64 QEMU on macOS, and QEMU with KVM through PVH on Linux) or `standard` (BIOS boot code, needed for x86 emulation on macOS and for QEMU without KVM). x86 images built on macOS default to `standard`. An explicit flag overrides `[build] layout` |
 | `--smoke` | Boot the image once after building, scan serial output for known failure signatures, then stop and remove the test VM |
 
 `unikernel.toml` is read automatically when present, or selected explicitly with
@@ -211,10 +215,13 @@ Key flags:
 | `run` | Shell commands to run before packaging (like a Dockerfile `RUN`) |
 | `pkgs` | Packages to include (e.g. `["eyberg/postgresql:11.3.0"]`); `--pkg` flags append to this list |
 | `pkg_source` | Package source: `ops` (default) or `jerboa`; an explicit `--pkg-source` flag wins |
-| `disk_size` | Minimum image size (e.g. `512M`, `1G`) for runtime scratch space |
-| `layout` | `standard` (default) or `compact`; see `--layout` |
-| `include` | Allowlist of project paths to package for `node`, `python` and `raw` builds (e.g. `["server.js", "lib", "node_modules", "**/*.json"]`). Paths are relative to the project root; `*` matches within a path segment, `**` across segments, and a directory matches everything below it. It only narrows what `.unignore` lets through — re-include ignored defaults such as `node_modules` with `!node_modules` in `.unignore`. Python builds must list `packages` (pip dependencies). The build fails if the entrypoint is not included |
+| `disk_size` | Boot disk size each VM gets (e.g. `512M`, `1G`) for runtime scratch space. It is stored in the image manifest and applied when the VM starts; the image itself holds only its contents |
+| `layout` | `compact` (default) or `standard`; see `--layout` |
+| `include` | Allowlist of project paths to package for `node`, `python` and `raw` builds (e.g. `["server.js", "lib", "node_modules", "**/*.json"]`). Paths are relative to the project root; `*` matches within a path segment, `**` across segments, and a directory matches everything below it. It only narrows what `.unignore` lets through. Node builds package `node_modules` (the production dependencies the driver installs); other languages ignore it by default, and `.unignore` can exclude it explicitly. Python builds must list `packages` (pip dependencies). The build fails if the entrypoint is not included |
 | `dirs` | Absolute directories to create empty in the image — volume mount points (a volume can only mount onto a directory that already exists in the image) and runtime scratch paths |
+| `install_scripts` | `true` lets `npm` run dependencies' install scripts (`preinstall`, `install`, `postinstall`) on the build machine. Off by default: `npm` runs with `--ignore-scripts` |
+| `sandbox` | `false` runs build steps directly on the build machine instead of confined (see below). Default `true` |
+| `network` | `true` lets `[build] run` commands reach the network. Off by default; `npm`, `pip`, `cargo` and `go build` always may, to fetch dependencies |
 
 For `lang = "raw"`, `[program] path` names the runtime binary resolved from
 package files; the program is executed from its real in-image path, so binaries
@@ -256,8 +263,28 @@ Build driver behavior to know:
   appended after the defaults and take precedence.
 - Node builds reinstall production dependencies when manifests, lockfiles, runtime
   version or host platform change, or when `node_modules` is missing. If `package-lock.json` exists, the driver uses
-  `npm ci --omit=dev --no-audit --no-fund`; otherwise it uses
-  `npm install --omit=dev --no-audit --no-fund`.
+  `npm ci --omit=dev --no-audit --no-fund --ignore-scripts`; otherwise it uses
+  `npm install --omit=dev --no-audit --no-fund --ignore-scripts`. Set
+  `[build] install_scripts = true` for dependencies that need their install scripts.
+- Build steps (`[build] run`, `npm`, `pip`, `cargo`, `go build`) run without
+  Jerboa's own credentials in their environment (`JERBOA_REGISTRY_TOKEN`,
+  `JERBOA_AUTH_TOKEN` and the other `JERBOA_*` tokens).
+- Build steps run in a sandbox: bubblewrap (`bwrap`) on Linux, `sandbox-exec`
+  on macOS. A confined step reads the host but writes only to the project
+  directory, the tools' caches (the user cache directory, `~/.npm`,
+  `~/.cargo`, `~/.rustup`, `GOPATH`, `GOCACHE`, `GOMODCACHE`) and a private
+  temporary directory (`TMPDIR`); it cannot read `~/.jerboa`, `~/.aws`,
+  `~/.azure`, `~/.config/gcloud`, `~/.kube`, `~/.docker` or `~/.gnupg`.
+  `[build] run` commands have no network unless `[build] network = true`;
+  the language tools keep it to fetch dependencies. A step that writes
+  elsewhere (for example straight to `/tmp`) fails: write under `TMPDIR` or
+  the project, or set `[build] sandbox = false`. Without `bwrap` (install
+  the `bubblewrap` package) or `sandbox-exec`, and on Windows, steps run
+  directly with a private `TMPDIR`, and the build warns.
+- The build context leaves out common credential files by default: `.env`,
+  `.env.*`, `.npmrc`, `.pypirc`, `.netrc`, `.aws/`, `.ssh/`, `id_rsa`,
+  `id_dsa`, `id_ecdsa`, `id_ed25519`, `*.pem` and `*.key`. Re-include one the
+  image needs with a negated pattern in `.unignore`, e.g. `!certs/server.pem`.
 - Python builds cache dependency installs. `pip install` runs only when
   `requirements.txt` or the Python version changes, tracked by
   `packages/.jerboa-deps-stamp`. Delete `packages/` or that stamp file to force
@@ -308,9 +335,40 @@ Resolve the image through the daemon and sign its disk digest with the default E
 Resolve the image through the daemon, hash its actual disk contents, and verify the
 signature against that digest. `run --verify enforce` pins the verified digest;
 each hypervisor verifies the bytes while writing its private boot copy and starts
-the VM only if the digest matches.
+the VM only if the digest matches. Signatures made before the `jerboa-ed25519-v1`
+format are refused; run `jerboa sign <image>` again to replace them.
 
 ---
+
+## Registry Commands
+
+Images move between machines through an image registry, by default
+`registry.jerboa.dev`. A push uploads the image's **recipe** and only the files
+the registry does not already have; a pull fetches the files the daemon lacks
+and assembles the disk locally with the recipe's pinned `mkfs`, then verifies it
+byte-for-byte. See the [registry protocol](/registry-protocol/).
+
+| Command | Description |
+|---|---|
+| `login [registry]` | Log in with GitHub (device flow: approve the code shown in a browser). `--token <pat>`, or `JERBOA_REGISTRY_TOKEN`, uses a personal access token instead, as CI does |
+| `logout [registry]` | Forget the stored credential |
+| `tag <image> <target>` | Give a stored image another name, e.g. the reference to push it as |
+| `push <[registry/]namespace/repository[:tag]>` | Push a tagged image; you may push to your GitHub user and to organizations you belong to |
+| `pull <[registry/]namespace/repository[:tag\|@digest]>` | Pull an image into the daemon's store |
+| `registry pat create\|ls\|rm` | Manage personal access tokens for CI (`--registry` selects the host; `create` takes `--expires-in <days>`, `--namespace` and `--delete`) |
+| `registry repo edit\|rm` | Set a repository's description or README (`edit --description`, `--readme`); delete a tag (`rm ns/repo:tag`) or a repository with all its tags (`rm ns/repo`, which asks unless `--yes`; newer than v0.56.0) |
+
+```sh
+jerboa build . --name web
+jerboa tag web:latest aitorcons/web:v1
+jerboa login
+jerboa push aitorcons/web:v1
+jerboa pull aitorcons/web:v1   # on another machine
+jerboa run aitorcons/web:v1
+```
+
+Credentials live in `~/.jerboa/credentials.json` (mode 0600) and stay with the
+CLI: the daemon only receives a 15-minute push token per push.
 
 ## Package Commands
 
@@ -365,12 +423,28 @@ jerboa build . --name redis
 - `--missing-files` — report static dependency analysis; missing dependencies fail creation.
 - `--sysroot <dir>` — resolve the loader and libraries within this rootfs, preserving guest paths.
 
+`pkg create` resolves the libraries of the program and of every ELF passed
+with `--map` or `--libs`. The archive is reproducible (sorted entries, root
+ownership, modes 0755/0644, timestamps from `SOURCE_DATE_EPOCH`), and the
+package records a `content_digest` of its files that images keep in their
+package references. Build-time Python files (`test`, `idlelib`, `tkinter`,
+`ensurepip`, `config-*` and similar, and optimized `.pyc`) are left out. See
+[Package recipes](/package-recipes/).
+
 `pkg from-docker` and selection operations also accept `--platform`. Docker
 imports record the requested reference, immutable image ID and available repository
 digest. Local variants coexist and take precedence over the remote index.
 `jerboa images inspect <ref>` displays image platform and integrated package
 versions, hashes and provenance. See [ARM64 package workflow](/packages-arm64/)
 for local sysroots, compatibility rules and reproducible Firecracker acceptance.
+
+Every build is also recorded as a **recipe**: the mkfs manifest with each file
+replaced by its SHA-256, the pinned kernel toolset version, and the expected disk
+digest. The files themselves are kept once each in the daemon's blob store
+(`~/.jerboa/blobs`). A recipe rebuilds the same disk byte-for-byte on any host, which
+is how registry pushes and pulls will transfer images. `jerboa images inspect`
+shows the recipe digest and `jerboa images recipe <ref>` prints the recipe.
+Images whose toolset has no version marker are built without one.
 
 `pkg load` uses the root command's endpoint and authentication configuration,
 including `--host` and `JERBOA_HOST`. Use `--source jerboa` for local packages.
@@ -385,7 +459,11 @@ package, then the sole downloaded variant; use the flag for explicit selection.
 
 Flags:
 
-- `--subnet`
+- `--subnet`: an IPv4 subnet from /16 to /29 inside 10.0.0.0/8, 172.16.0.0/12,
+  192.168.0.0/16 or 100.64.0.0/10. On Linux it must not overlap an address or
+  route the host already has, nor hold the guest DNS address 10.53.0.53. The
+  gateway is the subnet's first address. Without `--subnet`, a free /24 in
+  10.100.0.0/16 is chosen.
 - `--driver` (currently `bridge`)
 
 ### `jerboa network ls`
@@ -631,7 +709,8 @@ The daemon runs as `root` inside the dedicated distro. The client persists rende
 | Flag | Description |
 |---|---|
 | `-H, --host` | Listen endpoint |
-| `--auth-token` | Shared secret for `Auth.Hello` (env: `JERBOA_AUTH_TOKEN`); empty disables auth |
+| `--auth-token-file` | File (mode `0600`) holding the client auth token; alternatively set `JERBOA_AUTH_TOKEN`. Clients prove they hold it with an HMAC challenge, so the token is never sent, and the daemon proves it holds it before a client sends any request. On a TCP endpoint it must be at least 32 characters (`openssl rand -hex 32`) |
+| `--auth-token` | Deprecated: a token on the command line is visible to other local users in `ps`. Use `--auth-token-file` or `JERBOA_AUTH_TOKEN` |
 | `--insecure` | Allow serving a TCP endpoint without an auth token (unsafe). A TCP endpoint with no token is rejected at startup otherwise; a Unix socket needs no token (it is restricted to the owning user with `0600` permissions) |
 | `--qemu` | QEMU binary path (default `qemu-system-x86_64`) |
 | `--hypervisor` | `qemu` or `firecracker` (overrides `~/.jerboa/config.toml`) |
@@ -644,10 +723,13 @@ The daemon runs as `root` inside the dedicated distro. The client persists rende
 | `--vm-store` | VM state store backend: `file` (default) or `sqlite` |
 | `--vm-log-max-bytes` | Max in-memory serial log bytes retained per VM (`0` = 4 MiB default) |
 | `--log-format` | Log format: `text` (default) or `json` |
-| `--metrics-addr` | HTTP address for Prometheus metrics (e.g. `:9090`); empty disables metrics |
-| `--ui-addr` | HTTP address for the web dashboard (e.g. `:8080`); empty disables it |
+| `--metrics-addr` | HTTP address for Prometheus metrics (e.g. `127.0.0.1:9090`); empty disables metrics. Off loopback it needs an observability token |
+| `--ui-addr` | HTTP address for the web dashboard (e.g. `127.0.0.1:8080`); empty disables it. It needs an observability token, on loopback too |
+| `--observability-token-file` | File (mode `0600`) with the read-only token for metrics and the dashboard (env: `JERBOA_OBSERVABILITY_TOKEN`) |
 | `--trace-addr` | OTLP gRPC address for trace export (e.g. `localhost:4317`); empty disables tracing |
-| `--cluster-addr` | HTTP address for the cluster gossip endpoint (e.g. `:7946`); empty disables cluster |
+| `--cluster-addr` | HTTP address for the cluster gossip endpoint (e.g. `:7946`); empty disables cluster. Requires a cluster token |
+| `--cluster-token-file` | File (mode `0600`) with the token shared by all cluster nodes (env: `JERBOA_CLUSTER_TOKEN`) |
+| `--insecure-cluster` | Serve gossip without a cluster token (unsafe) |
 | `--join` | Comma-separated seed node addresses to join (e.g. `10.0.0.2:7946,10.0.0.3:7946`) |
 
 Observability and store flags (`--metrics-addr`, `--ui-addr`, `--trace-addr`,
@@ -670,11 +752,16 @@ Root commands currently exposed by the built CLI:
 - `init`
 - `inspect`
 - `kernel`
+- `login`
+- `logout`
 - `logs`
 - `network`
 - `node`
 - `pkg`
 - `ps`
+- `pull`
+- `push`
+- `registry`
 - `rm`
 - `rmi`
 - `run`
@@ -682,6 +769,7 @@ Root commands currently exposed by the built CLI:
 - `stats`
 - `status`
 - `stop`
+- `tag`
 - `verify`
 - `version`
 - `volume`
