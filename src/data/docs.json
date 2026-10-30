@@ -1,7 +1,7 @@
 {
   "versions": {
-    "cli": "0.55.1",
-    "kernel": "0.2.2"
+    "cli": "0.56.0",
+    "kernel": "0.2.3"
   },
   "pages": [
     {
@@ -77,9 +77,27 @@
       "order": 11
     },
     {
+      "title": "Package recipes",
+      "slug": "package-recipes",
+      "url": "/package-recipes/",
+      "order": 12
+    },
+    {
       "title": "PostgreSQL ARM64 on Nanos",
       "slug": "postgres-arm64",
       "url": "/postgres-arm64/",
+      "order": 12
+    },
+    {
+      "title": "Registry protocol",
+      "slug": "registry-protocol",
+      "url": "/registry-protocol/",
+      "order": 12
+    },
+    {
+      "title": "Image registry",
+      "slug": "registry",
+      "url": "/registry/",
       "order": 12
     },
     {

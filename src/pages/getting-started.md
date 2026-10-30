@@ -137,12 +137,18 @@ sudo jerboad --host unix:///var/run/jerboad.sock
 Useful daemon flags:
 
 ```bash
+sudo sh -c 'umask 077; mkdir -p /etc/jerboa; openssl rand -hex 32 > /etc/jerboa/observability-token'
 sudo jerboad \
   --host unix:///var/run/jerboad.sock \
-  --metrics-addr :9090 \
-  --ui-addr :8080 \
+  --metrics-addr 127.0.0.1:9090 \
+  --ui-addr 127.0.0.1:8080 \
+  --observability-token-file /etc/jerboa/observability-token \
   --vm-store sqlite
 ```
+
+The dashboard needs that token even on `127.0.0.1`, because every local user
+can reach loopback: open `http://127.0.0.1:8080/ui` and sign in with the
+contents of the file. Prometheus sends it as `Authorization: Bearer <token>`.
 
 ### Windows daemon
 
@@ -296,6 +302,21 @@ with a bind address, Docker-style:
 jerboa run myapp:latest --network app -p 127.0.0.1:8080:80   # localhost only
 jerboa run myapp:latest --network app -p 8080:80             # all interfaces
 ```
+
+Ports baked into an image (`[run] ports` in `unikernel.toml`) always publish on
+`127.0.0.1`, whatever bind address the manifest gives; pass `-p` to publish them
+elsewhere.
+
+### Network isolation (Linux)
+
+VMs join only networks created with `jerboa network create`. On Linux the
+daemon installs nftables rules (tables `inet jerboa_guard` and
+`bridge jerboa_guard`) that keep guests away from the host's `127.0.0.1`, stop
+traffic routed between two Jerboa networks, let hosts outside reach guests only
+through published ports, and drop frames a guest sends with another guest's MAC
+or IP address. Without `nft` the daemon logs a warning and runs without them.
+IPv4 forwarding (`net.ipv4.ip_forward`) stays enabled host-wide while networks
+are in use.
 
 **Windows / WSL2:** the daemon and the published port live inside the dedicated
 `jerboa` WSL2 distro. With WSL2's default NAT networking the port is **not**

@@ -51,12 +51,11 @@ preview, as selected for this rollout.
    product version, Desktop SHA, Firecracker SHA, kernel source and kernel version.
 4. Approve the KVM validation environment after reviewing the source revisions.
 5. Wait for validation, the selected toolset's QEMU/KVM and Firecracker boot
-   checks, Linux builds, Mac packaging and Windows packaging. Windows consumes the
-   current run's CLI artifact plus an explicit version/hash manifest; it never
-   fetches stable to decide what to package. The candidate workflow no longer runs
-   the Windows installer smoke (the self-hosted Windows runner lacked the capacity
-   for it); run `scripts/windows-install-smoke.sh` by hand on a Windows machine with
-   WSL2 when a release changes the Windows or WSL path.
+   checks, Linux builds, Mac packaging, Windows packaging and the full Windows
+   installer smoke. Windows consumes the current run's CLI artifact plus an
+   explicit version/hash manifest; it never fetches stable to decide what to package.
+   The installer smoke runs on a Windows machine started for this run only (see
+   [Windows installer smoke](#windows-installer-smoke)); assembly waits for it.
 6. Download `release-candidate` and `macos-app` from the run. The candidate includes a
    signed manifest, a signed inventory with source revisions, exact payload hashes,
    and a generated Windows update feed. Stable remains unchanged.
@@ -68,6 +67,41 @@ Candidates currently retain artifacts for 30 days (platform intermediates use th
 repository default unless overridden). Expired candidates must be rebuilt and
 revalidated. Never pretend a rebuilt binary is the old candidate. R2 release artifacts
 are retained; these workflows contain no automated deletion.
+
+### Windows installer smoke
+
+The smoke installs the signed `desktop-windows` installer silently, provisions the
+WSL2 distro from the run's `distro-rootfs` artifact and boots example unikernels
+through `scripts/windows-install-smoke.sh`. Hosted runners do not offer WSL2, so the
+candidate workflow brings its own machine:
+
+- `windows-runner-up` (GitHub-hosted Linux, `windows-runner` environment) registers
+  a single-job [just-in-time runner](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/autoscaling-with-self-hosted-runners#using-just-in-time-runners)
+  labelled `jerboa-run-<run id>-<attempt>`, starts one EC2 Windows instance from the
+  prepared image and launch template, and waits until the runner is online. It
+  starts once Windows packaging and the WSL rootfs are built.
+- `windows-smoke` runs on that runner only. It has read-only repository access and
+  no secrets.
+- `windows-runner-down` always runs once an instance was started: it terminates the
+  instance and removes the runner registration if the machine never took the job.
+  The instance also stops itself after its job and at the latest 90 minutes after
+  boot.
+
+`scripts/release/windows-runner.sh` holds these steps. AWS access uses the job's
+OIDC token and a role that may only start and terminate these instances; the runner
+is registered through a GitHub App installed on this repository alone. The image,
+launch template, role and App come from the `jerboa-infra` Windows runner setup,
+which also fills the `windows-runner` environment (main only): variables
+`WINDOWS_RUNNER_ROLE_ARN`, `WINDOWS_RUNNER_REGION`,
+`WINDOWS_RUNNER_LAUNCH_TEMPLATE_ID`, `WINDOWS_RUNNER_APP_ID` and secret
+`WINDOWS_RUNNER_APP_PRIVATE_KEY`.
+
+The smoke is required: if the environment is not configured, `windows-runner-up`
+fails with the list of missing settings and no candidate is assembled. To retry a
+failed smoke, re-run `windows-runner-up` (which re-runs its dependents) rather than
+only the failed jobs: a new machine is registered under the new attempt's label.
+To run the smoke by hand, use a Windows machine with WSL2 and follow the steps of
+`windows-smoke`.
 
 ## Promote
 
@@ -134,6 +168,14 @@ stable backwards does not automatically downgrade already-updated Electron clien
 An emergency rollback requires a reviewed client/downgrade policy and restoration of
 the complete old manifest/signature/feed set; never modify historic binary contents.
 
+Every assembled manifest carries `generated`, its UTC creation time. The promoter
+refuses to publish a manifest generated before the live one, and clients record, per
+release origin and channel, the newest `generated` they accepted (in
+`~/.jerboa/release-state.json`) and refuse an older manifest, or one without the
+field once a dated one was seen. A restored old manifest is therefore refused by
+clients that saw a newer one: an emergency rollback means re-signing the old content
+as a new candidate, not republishing the old manifest bytes.
+
 Mac continues to use ad-hoc signatures and the documented preview installation flow.
 Production Developer ID/notarization requires a certificate and Apple credentials;
 `sign-notarize-macos.sh` contains the runtime signing procedure. Windows uses
@@ -159,6 +201,15 @@ bytes after engine-only edits. Use explicit `stable` reuse for CLI-only releases
 when no new Linux kernel is intended. Reusing a kernel version with different
 bytes, or promoting a lower kernel version, is rejected before changing stable.
 Retries with identical published bytes remain safe.
+
+A source-built kernel also publishes its host tools: `kernel/<v>/mkfs-linux-arm64`
+(built on `ubuntu-24.04-arm` by `kernel-tools-arm64`), `kernel/<v>/mkfs-darwin-arm64`
+(from `build-macos`) and `kernel/<v>/toolset.json`, signed with the release key,
+which lists the mkfs for every host including the kernel's own `mkfs-linux-amd64`.
+Image recipes name a toolset version, and clients assembling one fetch that
+version's mkfs through this document (`tools.MkfsForVersion`). Assembly checks the
+binaries' headers match their platforms. A reused kernel already shipped these
+files with its first release.
 
 The `kvm` runner needs `cc` with static libc support, QEMU x86_64, Firecracker and
 read/write access to `/dev/kvm`. The boot job uses isolated disks, records both
@@ -199,3 +250,12 @@ the release, including the daemon service capabilities needed for guest DNS.
 Promotion never substitutes the installer from its own checkout. Retrying a
 legacy candidate without a tracked installer leaves the bootstrap alias alone;
 publish a new candidate to update it.
+
+## Image registry operations
+
+The image registry (`registry.jerboa.dev`, [user guide](/registry/),
+[protocol](/registry-protocol/)) server and its operations live in
+a private repository. The Go client and the protocol stay here; the server's
+CI runs this repository's `tests/registry` end to end on every change and
+daily against `main`, so a client change that breaks the protocol fails there
+within a day.
