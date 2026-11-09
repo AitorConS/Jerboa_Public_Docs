@@ -82,7 +82,7 @@ const jsonLd = {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400..600&family=Geist+Mono:wght@400..500&display=swap"
       rel="stylesheet"
     />
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
@@ -90,5 +90,8 @@ const jsonLd = {
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <slot />
+    <script>
+      import '../scripts/dither.js';
+    </script>
   </body>
 </html>

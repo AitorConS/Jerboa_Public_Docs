@@ -1,18 +1,23 @@
 ---
+// Shared footer: dunes behind its top edge, the same links as the header.
 ---
 <footer class="site-footer">
-  <div class="footer-row">
-    <a href="https://jerboa.dev/" class="brand jb-link">
-      <img class="brand-mark" src="/jerboa.webp" alt="" width="24" height="24" loading="lazy" />
-      <span class="brand-name" translate="no">jerboa</span>
-    </a>
-    <span class="footer-note">Apache-2.0 · Nanos unikernel</span>
-    <div class="spacer"></div>
-    <div class="footer-links">
+  <div class="footer-dunes" aria-hidden="true"><canvas class="dither" data-dither="dunes"></canvas></div>
+  <div class="footer-row wrap">
+    <div class="footer-brand">
+      <a href="https://jerboa.dev/" class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name" translate="no">jerboa</span>
+      </a>
+      <p class="footer-note">Run your app as its own virtual machine.</p>
+      <p class="footer-legal">Apache-2.0 · Nanos unikernel</p>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
       <a class="jb-link" href="/getting-started/">Docs</a>
+      <a class="jb-link" href="https://hub.jerboa.dev/">Hub</a>
       <a class="jb-link" href="https://jerboa.dev/benchmarks/">Benchmarks</a>
       <a class="jb-link" href="https://jerboa.dev/releases/">Releases</a>
       <a class="jb-link" href="https://github.com/AitorConS/jerboa">GitHub</a>
-    </div>
+    </nav>
   </div>
 </footer>

@@ -18,11 +18,11 @@ const rules = [
   [/#[0-9a-fA-F]{3,8}\b(?![\w-])/g, 'literal colour: use a colour role token', styles],
   [/\b(rgba?|hsla?|oklch)\(/g, 'literal colour function: use a colour role token', styles],
   [/\d+m?s\b(?=[^;{}]*(transition|animation)|\s*(ease|linear|cubic))/g, 'literal duration: use a --duration token', styles],
-  // Ban 1 and the anchor: no gradients at all.
-  [/gradient\(/g, 'gradient: the anchor allows none', styles],
-  // Anchor: elevation is a border, never a shadow or blur.
-  [/box-shadow:\s*(?!none|var\(--shadow\))/g, 'shadow: use a --border hairline', styles],
-  [/backdrop-filter|filter:\s*blur/g, 'blur: not allowed by the anchor', styles],
+  // Ban 1: gradients exist only as the backdrop tokens (masks, glow, sheen).
+  [/gradient\(/g, 'gradient: use a backdrop token from tokens.css', styles],
+  // Depth is a hairline first; shadows and blur only through their tokens.
+  [/box-shadow:\s*(?!\s|none|var\(--shadow)/g, 'shadow: use a --shadow token', styles],
+  [/backdrop-filter:\s*(?!\s|var\(--blur)|(?<!-)filter:\s*blur/g, 'blur: use the --blur-header token', styles],
   [/transition:\s*all\b/g, 'transition: all: list properties', styles],
   [/outline:\s*(none|0)\b/g, 'outline removed without replacement', styles],
   // Ban 4: default font tells.
