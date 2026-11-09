@@ -53,6 +53,11 @@ const groups = [
 const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.md` === frontmatter.source);
 const group = groups.find(g => g.pages.some(page => `${page.slug}.md` === frontmatter.source));
 const pageUrl = new URL(Astro.url.pathname, Astro.site).href;
+// The pages in sidebar order, for the previous and next links under the article.
+const ordered = groups.flatMap(g => g.pages);
+const at = current ? ordered.indexOf(current) : -1;
+const previous = at > 0 ? ordered[at - 1] : undefined;
+const following = at >= 0 && at < ordered.length - 1 ? ordered[at + 1] : undefined;
 
 // schema.org: the page is a technical article about jerboa, inside a
 // Documentation > section > page trail.
@@ -103,7 +108,16 @@ const structuredData = [
       </nav>
     </aside>
     <main class="doc-main" id="main">
-      <slot />
+      <p class="eyebrow crumb">{group ? group.title : 'Documentation'}</p>
+      <article class="prose">
+        <slot />
+      </article>
+      {(previous || following) && (
+      <nav class="pager" aria-label="More pages">
+        {previous ? <a class="pager-link" href={previous.url}><span class="eyebrow">Previous</span><span class="pager-title">{previous.title}</span></a> : <span></span>}
+        {following && <a class="pager-link is-next" href={following.url}><span class="eyebrow">Next</span><span class="pager-title">{following.title}</span></a>}
+      </nav>
+      )}
     </main>
     {current && current.headings.length > 0 && (
     <nav class="toc" aria-label="On this page">
@@ -148,9 +162,34 @@ const structuredData = [
     document.querySelectorAll('.doc-main h2[id]').forEach((h) => observer.observe(h));
     (window as any).__tocObserver = observer;
   };
+  // A copy button on every code block. The label reports the outcome.
+  const setupCopy = () => {
+    document.querySelectorAll<HTMLElement>('.prose pre:not([data-copy-bound])').forEach((pre) => {
+      pre.setAttribute('data-copy-bound', '');
+      const frame = document.createElement('div');
+      frame.className = 'code-frame';
+      pre.replaceWith(frame);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'code-copy';
+      btn.textContent = 'Copy';
+      btn.setAttribute('aria-label', 'Copy code');
+      btn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(pre.innerText.trimEnd());
+          btn.textContent = 'Copied';
+        } catch {
+          btn.textContent = 'Select to copy';
+        }
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      });
+      frame.append(pre, btn);
+    });
+  };
   syncGroups();
   setupSpy();
-  document.addEventListener('astro:page-load', () => { syncGroups(); setupSpy(); });
+  setupCopy();
+  document.addEventListener('astro:page-load', () => { syncGroups(); setupSpy(); setupCopy(); });
 </script>
 </Base>
 <style>
@@ -159,47 +198,56 @@ const structuredData = [
   html { scroll-behavior: smooth; }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
-  .docs-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr); gap: var(--space-48); align-items: start; padding-top: var(--space-40); padding-bottom: var(--space-80); }
-  aside, .toc { position: sticky; top: calc(var(--nav-height) + var(--space-24)); max-height: calc(100dvh - var(--nav-height) - var(--space-48)); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-  .eyebrow { font: var(--weight-medium) var(--text-12) / var(--leading-body) var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: var(--space-12); }
+  /* Sidebar, article and on-page index. The sidebar is as wide as the rail on
+     jerboa.dev, so the two sites share their left edge. */
+  .docs-grid { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr) var(--rail); gap: var(--space-64); align-items: start; padding-top: var(--space-48); }
+  aside, .toc { position: sticky; top: calc(var(--nav-height) + var(--space-32)); max-height: calc(100dvh - var(--nav-height) - var(--space-64)); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .eyebrow { font: var(--weight-medium) var(--text-12) / var(--leading-body) var(--font-mono); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--text-muted); }
+  aside > .eyebrow, .toc > .eyebrow { margin-bottom: var(--space-12); }
 
   /* ===== sidebar tree ===== */
   .doc-tree { font-size: var(--text-14); }
-  .doc-tree summary { display: flex; align-items: center; gap: var(--space-8); min-height: var(--control-lg); list-style: none; cursor: pointer; font-weight: var(--weight-medium); color: var(--text); }
+  .tree-group + .tree-group { margin-top: var(--space-8); }
+  .doc-tree summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); min-height: var(--control-md); padding-right: var(--space-8); border-radius: var(--radius-sm); list-style: none; cursor: pointer; font-weight: var(--weight-medium); color: var(--text); }
   .doc-tree summary::-webkit-details-marker { display: none; }
-  .doc-tree summary::before { content: ''; width: var(--space-4); height: var(--space-4); border-right: var(--hairline) solid var(--text-muted); border-bottom: var(--hairline) solid var(--text-muted); transform: rotate(-45deg); transition: transform var(--duration-layout) var(--ease-layout); }
-  .doc-tree details[open] > summary::before { transform: rotate(45deg); }
-  .tree-children { border-left: var(--hairline) solid var(--border); margin-left: var(--space-4); }
-  .doc-tree a { display: flex; align-items: center; min-height: var(--control-lg); margin-left: calc(-1 * var(--hairline)); padding: 0 var(--space-12); border-left: var(--hairline) solid transparent; color: var(--text-muted); transition: color var(--duration-hover) var(--ease-hover), border-color var(--duration-hover) var(--ease-hover); }
-  .doc-tree a:hover { color: var(--text); }
-  .doc-tree a[aria-current] { color: var(--accent); border-left-color: var(--text); }
+  .doc-tree summary::after { content: ''; width: var(--space-6); height: var(--space-6); border-right: var(--hairline) solid var(--text-muted); border-bottom: var(--hairline) solid var(--text-muted); transform: rotate(-45deg); transition: transform var(--duration-layout) var(--ease-layout); }
+  .doc-tree details[open] > summary::after { transform: rotate(45deg); }
+  .tree-children { border-left: var(--hairline) solid var(--border); }
+  .doc-tree a { display: flex; align-items: center; min-height: var(--control-md); margin-left: calc(-1 * var(--hairline)); padding: var(--space-4) var(--space-16); border-left: var(--hairline) solid transparent; color: var(--text-muted); line-height: var(--leading-heading); transition: color var(--duration-hover) var(--ease-hover), border-color var(--duration-hover) var(--ease-hover); }
+  .doc-tree a:hover { color: var(--text); border-left-color: var(--border-strong); }
+  .doc-tree a[aria-current] { color: var(--accent); border-left-color: var(--accent); }
 
   /* ===== on this page ===== */
-  .toc { font-size: var(--text-14); }
+  .toc { font-size: var(--text-13); }
   .toc ul { list-style: none; border-left: var(--hairline) solid var(--border); }
-  .toc a { display: flex; align-items: center; min-height: var(--control-lg); margin-left: calc(-1 * var(--hairline)); padding: 0 var(--space-12); border-left: var(--hairline) solid transparent; color: var(--text-muted); transition: color var(--duration-hover) var(--ease-hover), border-color var(--duration-hover) var(--ease-hover); }
+  .toc a { display: flex; align-items: center; min-height: var(--control-sm); margin-left: calc(-1 * var(--hairline)); padding: var(--space-4) var(--space-16); border-left: var(--hairline) solid transparent; color: var(--text-muted); line-height: var(--leading-heading); transition: color var(--duration-hover) var(--ease-hover), border-color var(--duration-hover) var(--ease-hover); }
   .toc a:hover { color: var(--text); }
-  .toc a[aria-current='true'] { color: var(--accent); border-left-color: var(--text); }
+  .toc a[aria-current='true'] { color: var(--text); border-left-color: var(--accent); }
 
   /* ===== article ===== */
-  .doc-main { min-width: 0; max-width: var(--reading); font-size: var(--text-16); line-height: var(--leading-body); overflow-wrap: anywhere; }
-  .doc-main :global(h1), .doc-main :global(h2), .doc-main :global(h3) { font-family: var(--font-display); font-weight: var(--weight-display); line-height: var(--leading-display); letter-spacing: var(--tracking-display); text-wrap: balance; }
-  .doc-main :global(h1) { font-size: var(--text-48); margin-bottom: var(--space-32); }
-  .doc-main :global(h2) { font-size: var(--text-24); margin: var(--space-64) 0 var(--space-16); padding-top: var(--space-32); border-top: var(--hairline) solid var(--border); }
-  .doc-main :global(h3) { font-size: var(--text-16); margin: var(--space-32) 0 var(--space-12); }
+  .doc-main { min-width: 0; }
+  .crumb { color: var(--accent); margin-bottom: var(--space-12); }
+  .prose { max-width: var(--reading); font-size: var(--text-16); line-height: var(--leading-reading); overflow-wrap: anywhere; }
+  .prose :global(h1), .prose :global(h2), .prose :global(h3) { color: var(--text); }
+  .prose :global(h1) { font-size: var(--text-40); line-height: var(--leading-display); letter-spacing: var(--tracking-display); margin-bottom: var(--space-32); }
+  .prose :global(h2) { font-size: var(--text-24); line-height: var(--leading-heading); letter-spacing: var(--tracking-heading); margin: var(--space-48) 0 var(--space-16); padding-top: var(--space-48); border-top: var(--hairline) solid var(--border); }
+  .prose :global(h3) { font-size: var(--text-18); line-height: var(--leading-heading); letter-spacing: var(--tracking-heading); margin: var(--space-32) 0 var(--space-12); }
+  .prose :global(h4) { font-size: var(--text-16); font-weight: var(--weight-display); margin: var(--space-24) 0 var(--space-8); }
   /* The synced pages put a rule under the title and between sections; the
      section border replaces them. */
-  .doc-main :global(h1 + hr), .doc-main :global(hr:has(+ h2)) { display: none; }
-  .doc-main :global(h1 + hr + h2), .doc-main :global(h1 + h2) { margin-top: 0; padding-top: 0; border-top: 0; }
-  .doc-main :global(p), .doc-main :global(ul), .doc-main :global(ol), .doc-main :global(pre), .doc-main :global(table), .doc-main :global(blockquote) { margin-bottom: var(--space-16); }
-  .doc-main :global(p), .doc-main :global(li) { color: var(--stone-200); }
-  .doc-main :global(ul), .doc-main :global(ol) { padding-left: var(--space-24); }
-  .doc-main :global(li + li) { margin-top: var(--space-4); }
-  .doc-main :global(strong) { color: var(--text); font-weight: var(--weight-display); }
-  .doc-main :global(a) { color: var(--accent); text-decoration: underline; text-decoration-color: var(--graphic-muted); text-underline-offset: 0.25em; transition: text-decoration-color var(--duration-hover) var(--ease-hover); }
-  .doc-main :global(a:hover) { text-decoration-color: var(--accent); }
-  .doc-main :global(code) { font-family: var(--font-mono); font-size: var(--text-14); }
-  .doc-main :global(:not(pre) > code) { padding: 0 var(--space-4); border: var(--hairline) solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); }
+  .prose :global(h1 + hr), .prose :global(hr:has(+ h2)) { display: none; }
+  .prose :global(h1 + hr + h2), .prose :global(h1 + h2) { margin-top: 0; padding-top: 0; border-top: 0; }
+  .prose :global(p), .prose :global(ul), .prose :global(ol), .prose :global(table), .prose :global(blockquote), .prose :global(.code-frame), .prose :global(pre) { margin-bottom: var(--space-20); }
+  .prose :global(p), .prose :global(li) { color: var(--text-body); }
+  .prose :global(ul), .prose :global(ol) { padding-left: var(--space-24); }
+  .prose :global(li + li) { margin-top: var(--space-6); }
+  .prose :global(li > ul), .prose :global(li > ol) { margin: var(--space-6) 0 0; }
+  .prose :global(li::marker) { color: var(--graphic-muted); }
+  .prose :global(strong) { color: var(--text); font-weight: var(--weight-display); }
+  .prose :global(a) { color: var(--accent); text-decoration: underline; text-decoration-color: var(--accent-line); text-underline-offset: 0.25em; transition: text-decoration-color var(--duration-hover) var(--ease-hover); }
+  .prose :global(a:hover) { text-decoration-color: var(--accent); }
+  .prose :global(code) { font-family: var(--font-mono); font-size: var(--text-14); }
+  .prose :global(:not(pre) > code) { padding: var(--space-2) var(--space-6); border: var(--hairline) solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: var(--text-13); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
   /* Shiki's css-variables theme, mapped onto the stone tokens: monochrome,
      with emphasis by lightness only. */
   :global(:root) {
@@ -211,25 +259,45 @@ const structuredData = [
     --astro-code-token-parameter: var(--stone-200);
     --astro-code-token-string: var(--stone-400);
     --astro-code-token-string-expression: var(--stone-400);
-    --astro-code-token-comment: var(--text-muted);
+    --astro-code-token-comment: var(--graphic-muted);
     --astro-code-token-punctuation: var(--text-muted);
     --astro-code-token-link: var(--text);
   }
   /* Shiki writes its own background inline; the surface token wins. */
-  .doc-main :global(pre) { padding: var(--space-16); border: var(--hairline) solid var(--border); border-radius: var(--radius-lg); background: var(--surface) !important; white-space: pre-wrap; font-size: var(--text-14); line-height: var(--leading-body); }
-  .doc-main :global(table) { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-14); font-variant-numeric: tabular-nums; }
-  .doc-main :global(th), .doc-main :global(td) { padding: var(--space-12) var(--space-12) var(--space-12) 0; border-bottom: var(--hairline) solid var(--border); text-align: left; vertical-align: top; }
-  .doc-main :global(th) { font: var(--weight-medium) var(--text-12) / var(--leading-body) var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
-  .doc-main :global(blockquote) { padding-left: var(--space-16); border-left: var(--focus-width) solid var(--border); color: var(--text-muted); }
-  .doc-main :global(hr) { border: 0; border-top: var(--hairline) solid var(--border); margin: var(--space-32) 0; }
+  .prose :global(pre) { padding: var(--space-16) var(--space-20); border: var(--hairline) solid var(--border); border-radius: var(--radius-lg); background: var(--surface) !important; white-space: pre-wrap; font-size: var(--text-14); line-height: var(--leading-reading); }
+  /* The copy button sits in the block's corner and shows on hover or focus. */
+  .prose :global(.code-frame) { position: relative; }
+  .prose :global(.code-frame pre) { margin-bottom: 0; }
+  .prose :global(.code-frame .code-copy) { position: absolute; top: var(--space-6); right: var(--space-6); border: var(--hairline) solid var(--border); background: var(--surface-raised); opacity: 0; transition: opacity var(--duration-hover) var(--ease-hover), color var(--duration-hover) var(--ease-hover); }
+  .prose :global(.code-frame:hover .code-copy), .prose :global(.code-frame .code-copy:focus-visible) { opacity: 1; }
+  @media (hover: none) { .prose :global(.code-frame .code-copy) { opacity: 1; } }
+  .prose :global(table) { display: block; width: 100%; overflow-x: auto; border-collapse: collapse; font-size: var(--text-14); line-height: var(--leading-body); font-variant-numeric: tabular-nums; overflow-wrap: normal; }
+  .prose :global(th), .prose :global(td) { padding: var(--space-12) var(--space-16) var(--space-12) 0; border-bottom: var(--hairline) solid var(--border); text-align: left; vertical-align: top; }
+  .prose :global(td) { color: var(--text-body); }
+  .prose :global(th) { font: var(--weight-medium) var(--text-12) / var(--leading-body) var(--font-mono); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--text-muted); white-space: nowrap; }
+  .prose :global(blockquote) { padding: var(--space-12) var(--space-16); border-left: var(--focus-width) solid var(--accent); border-radius: 0 var(--radius-md) var(--radius-md) 0; background: var(--accent-soft); }
+  .prose :global(blockquote > :last-child) { margin-bottom: 0; }
+  .prose :global(hr) { border: 0; border-top: var(--hairline) solid var(--border); margin: var(--space-32) 0; }
+  .prose :global(img) { max-width: 100%; height: auto; border-radius: var(--radius-md); }
 
-  @media (max-width: 70em) {
-    .docs-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 3fr); }
+  /* ===== previous and next ===== */
+  .pager { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-16); max-width: var(--reading); margin-top: var(--space-64); padding-top: var(--space-32); border-top: var(--hairline) solid var(--border); }
+  .pager-link { display: grid; gap: var(--space-4); padding: var(--space-16) var(--space-20); border: var(--hairline) solid var(--border); border-radius: var(--radius-lg); transition: border-color var(--duration-hover) var(--ease-hover), background-color var(--duration-hover) var(--ease-hover); }
+  .pager-link:hover { border-color: var(--border-strong); background: var(--surface); }
+  .pager-link.is-next { text-align: right; }
+  .pager-title { font-weight: var(--weight-medium); color: var(--text); }
+  .pager-link:hover .pager-title { color: var(--accent); }
+
+  @media (max-width: 76em) {
+    .docs-grid { grid-template-columns: var(--rail) minmax(0, 1fr); }
     .toc { display: none; }
   }
   @media (max-width: 54em) {
     .docs-grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-24); padding-top: var(--space-24); }
-    aside { position: static; max-height: none; }
-    .doc-main :global(h1) { font-size: var(--text-32); }
+    aside { position: static; max-height: none; padding-bottom: var(--space-16); border-bottom: var(--hairline) solid var(--border); }
+    .doc-tree summary, .doc-tree a { min-height: var(--control-lg); }
+    .prose :global(h1) { font-size: var(--text-32); }
+    .pager { grid-template-columns: minmax(0, 1fr); }
+    .pager-link.is-next { text-align: left; }
   }
 </style>

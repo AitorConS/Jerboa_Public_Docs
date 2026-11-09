@@ -1,65 +1,93 @@
 /*
- * Design tokens for jerboa.dev — the single source of truth (see DESIGN_RULES.md).
- * Anchor: Linear / Vercel / Geist, dark only, balanced density.
- * Every length, colour, duration and font used by the site must be one of these
- * variables. `pnpm run lint:design` fails on literal values anywhere else.
+ * Design tokens for jerboa.dev, docs.jerboa.dev and hub.jerboa.dev — the single
+ * source of truth (see DESIGN_RULES.md). Night-desert palette: warm blacks,
+ * one orange. Every length, colour, duration and font used by the sites must
+ * be one of these variables. `pnpm run lint:design` fails on literal values
+ * anywhere else. Keep this file identical in Jerboa_Docs and
+ * Jerboa_Public_Docs; the hub copies the same values into public/hub.css.
  */
 :root {
   color-scheme: dark;
 
-  /* ---- colour: stone neutrals (Tailwind stone scale) ---- */
-  --stone-50: #fafaf9;
+  /* ---- colour: warm neutrals (stone scale, two steps added) ---- */
+  --stone-50: #faf9f7;
   --stone-200: #e7e5e4;
+  --stone-300: #d6d3d1;
   --stone-400: #a8a29e;
   --stone-500: #78716c;
+  --stone-700: #3d3835;
   --stone-800: #292524;
-  --stone-900: #1c1917;
+  --stone-850: #1f1c1a;
+  --stone-900: #171413;
   --stone-950: #0c0a09;
 
+  /* ---- colour: the one orange, in three depths ---- */
+  --orange-300: #ffb574;
+  --orange-400: #ff9a47;
+  --orange-500: #f9801f;   /* 7.7:1 on --bg: colours text as well as fills */
+  --orange-700: #a8490d;
+  --orange-950: #1d1008;
+
   /* ---- colour: semantic, one shade each ---- */
-  --red: #ef4444;      /* red-500: red-600 is 4.1:1 on --bg, below AA for text */
-  --emerald: #059669;  /* emerald-600 */
-  --amber: #d97706;    /* amber-600 */
+  --red: #f0524b;       /* 5.7:1 on --bg */
+  --emerald: #2fb67c;   /* 7.6:1 on --bg */
+  --yellow: #e5b33a;    /* warnings: apart from the brand orange */
 
   /* ---- colour roles ---- */
   --bg: var(--stone-950);
-  --surface: var(--stone-900);
-  --border: var(--stone-800);       /* elevation is a 1px border, never a shadow */
+  --surface: var(--stone-900);        /* cards, code windows, inputs */
+  --surface-raised: var(--stone-850); /* hover, selected, menus */
+  --border: var(--stone-800);
+  --border-strong: var(--stone-700);  /* hover and focus-within outlines */
   --text: var(--stone-50);
-  --text-muted: var(--stone-400);   /* 7.8:1 on --bg */
-  --graphic-muted: var(--stone-500); /* non-text only: 4.1:1 on --bg */
-  --primary: var(--stone-50);       /* primary action fill */
+  --text-body: var(--stone-300);      /* long-form reading text: 13.3:1 */
+  --text-muted: var(--stone-400);     /* 7.8:1 on --bg */
+  --graphic-muted: var(--stone-500);  /* non-text only: 4.1:1 on --bg */
+  --primary: var(--stone-50);
   --on-primary: var(--stone-950);
   --danger: var(--red);
   --success: var(--emerald);
-  --warning: var(--amber);
-  --focus: var(--stone-50);
-  /* Brand accent: amber-600, 6.2:1 on --bg, so it may colour text as well as
-     fills. Never on the borders of blocks (cards, panels, tables, diagrams). */
-  --accent: var(--amber);
-  --accent-hover: color-mix(in srgb, var(--amber) 82%, var(--stone-50));
-  --on-accent: var(--stone-950);   /* 6.2:1 on --accent */
+  --warning: var(--yellow);
+  --focus: var(--orange-400);
+  --accent: var(--orange-500);
+  --accent-hover: var(--orange-400);
+  --accent-strong: var(--orange-300);
+  --accent-deep: var(--orange-700);
+  --accent-soft: color-mix(in srgb, var(--orange-500) 12%, transparent);
+  --accent-line: color-mix(in srgb, var(--orange-500) 40%, transparent);
+  --on-accent: var(--stone-950);      /* 7.7:1 on --accent */
+  --header-bg: color-mix(in srgb, var(--stone-950) 78%, transparent);
 
   /* ---- type ---- */
   --font-display: 'Geist', system-ui, sans-serif;
   --font-sans: 'Geist', system-ui, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, monospace;
   --text-12: 12px;
+  --text-13: 13px;
   --text-14: 14px;
   --text-16: 16px;
+  --text-18: 18px;
   --text-20: 20px;
   --text-24: 24px;
   --text-32: 32px;
+  --text-40: 40px;
   --text-48: 48px;
-  --leading-display: 1.1;
-  --leading-body: 1.5;
-  --tracking-display: -0.02em;
+  --text-64: 64px;
+  --leading-display: 1.08;
+  --leading-heading: 1.2;
+  --leading-body: 1.55;
+  --leading-reading: 1.7;
+  --tracking-display: -0.035em;
+  --tracking-heading: -0.02em;
+  --tracking-label: 0.08em;
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-display: 600;
 
   /* ---- spacing: 4/8 grid ---- */
+  --space-2: 2px;
   --space-4: 4px;
+  --space-6: 6px;
   --space-8: 8px;
   --space-12: 12px;
   --space-16: 16px;
@@ -70,6 +98,8 @@
   --space-48: 48px;
   --space-64: 64px;
   --space-80: 80px;
+  --space-96: 96px;
+  --space-128: 128px;
 
   /* ---- sizes ---- */
   --hairline: 1px;
@@ -80,21 +110,43 @@
   --control-lg: 44px;    /* minimum for tap targets */
   --nav-height: 64px;
   --container: 1200px;
-  --reading: 640px;
+  --reading: 680px;
+  --rail: 232px;
+  --dither-cell: 4px;    /* one dither dot; read by src/scripts/dither.js */
+  --hero-install: 560px; /* the install box in a hero */
+  --dunes-height: 96px;
+  --form: 760px;         /* widest a settings form gets */
+  --side: 360px;         /* a page's side column */
+  --textarea: 240px;
 
   /* ---- radius: buttons never above --radius-md ---- */
   --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
 
-  /* ---- shadow: none; elevation is --border ---- */
+  /* ---- depth: hairlines first; one soft shadow for floating layers ---- */
   --shadow: none;
+  --shadow-pop: 0 16px 40px -12px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.02);
+  --shadow-glow: 0 0 0 1px var(--accent-line), 0 12px 48px -16px color-mix(in srgb, var(--orange-500) 35%, transparent);
+  --blur-header: saturate(140%) blur(14px);
+
+  /* ---- backdrops: the only gradients on the sites. Masks fade the dither
+          canvas into the page; the glow sits behind hero headings. ---- */
+  --fade-from-left: linear-gradient(to right, transparent 0%, rgb(0 0 0 / 0.35) 38%, black 72%);
+  --fade-up: linear-gradient(to top, black 0%, rgb(0 0 0 / 0.6) 45%, transparent 100%);
+  --fade-down: linear-gradient(to bottom, black 0%, rgb(0 0 0 / 0.5) 55%, transparent 100%);
+  --fade-hero: linear-gradient(to right, transparent 18%, rgb(0 0 0 / 0.1) 36%, rgb(0 0 0 / 0.45) 56%, black 88%);
+  --fade-foot: linear-gradient(to bottom, black 78%, transparent 100%);
+  --fade-edges: linear-gradient(to right, transparent 0%, black 18%, black 82%, transparent 100%);
+  --glow-accent: radial-gradient(60% 60% at 70% 30%, color-mix(in srgb, var(--orange-500) 14%, transparent) 0%, transparent 70%);
+  --sheen: linear-gradient(to bottom, rgb(255 255 255 / 0.035), transparent 40%);
 
   /* ---- motion ---- */
-  --duration-hover: 60ms;
-  --duration-layout: 120ms;
-  --duration-modal: 180ms;
+  --duration-hover: 120ms;
+  --duration-layout: 180ms;
+  --duration-modal: 220ms;
   --ease-layout: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-hover: ease-out;
 }

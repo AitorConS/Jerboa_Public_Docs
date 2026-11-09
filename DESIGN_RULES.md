@@ -1,7 +1,7 @@
 # Design Rules — docs.jerboa.dev
 
 > **Claude Code: read this file before any UI/UX work in this repo.**
-> Generated with the `ui-web` skill (rshzrh/ui-design-skills). Updated: 2026-10-17
+> Generated with the `ui-web` skill (rshzrh/ui-design-skills). Updated: 2026-11-09
 
 ## Stack
 
@@ -16,34 +16,38 @@
 
 ## Aesthetic anchor
 
-- **Primary:** Linear / Vercel / Geist — monochrome stone, 1px borders instead
-  of shadows, short motion, no gradient, no secondary accent.
-- **Brand accent:** amber-600 `--accent` (#d97706), added 2026-10-18 on request.
-- **Type accent:** none.
-- **Motion accent:** none.
+- **Primary:** Linear / Vercel / Geist — warm stone neutrals, hairline borders,
+  short motion — with a night-desert layer on top, added 2026-11-09 on request.
+- **Brand accent:** one orange, `--accent` (#f9801f, 7.7:1 on the background),
+  with a lighter and a deeper shade for hover and for the backdrop.
+- **Backdrop:** sand drawn with ordered dithering (`src/scripts/dither.js`):
+  dunes to the horizon under a crescent moon behind hero and page titles, a
+  row of dunes behind the footer. It is the one decorative element, shared with the hub.
+- **Type accent:** none. **Motion accent:** the backdrop drifts slowly.
 
 Every value traces to that recipe. Deviations, each one deliberate:
 
 | Recipe says | Here | Why |
 |---|---|---|
 | Inter Display / Inter / JetBrains Mono | Geist / Geist / Geist Mono | The Inter ban is active; Geist is the anchor's own family. |
-| Type scale 12…48 (9 sizes) | 12, 14, 16, 20, 24, 32, 48 | The token audit allows at most 7 sizes. |
-| Semantic red-600 | red-500 | red-600 is 4.1:1 on the dark background, below AA for text; red-500 is 5.3:1. Approved 2026-10-17. |
-| No secondary accent | `--accent`: amber-600 | Requested. Text and small marks: the active nav link, the current page in the sidebar and section in the index, links in articles, commands in code blocks. Never on the borders of blocks, never on large backgrounds or gradients. |
-| Card-free sections | Sidebar, reading column and on-page index | The documentation layout; one bordered level for code blocks and tables. |
+| No secondary accent | `--accent`: orange | Requested. Text and small marks, fills (primary buttons, jerboa's data), the marker line of the current entry in side navigation and tabs, and at low strength (`--accent-soft`, `--accent-line`) for selected or hovered blocks. Never as the resting border of a card. |
+| No gradients | Backdrop tokens only | Masks that fade the dither canvas, one glow behind hero titles and a sheen on window bars, all defined in `tokens.css`. None in component code. |
+| No blur | The sticky header | `--blur-header`, so content scrolls under a translucent bar. |
+| No shadows | `--shadow-pop`, `--shadow-glow` | Floating layers only: the hero terminal, menus, the hub's search box. Cards stay flat. |
+| Warning = amber | `--yellow` | Keeps warnings apart from the brand orange. |
 
 ## Active ban patterns
 
 All eight are active:
 
-1. Generic gradient slop — and, by the anchor, no gradients at all.
+1. Generic gradient slop. Gradients exist only as the backdrop tokens.
 2. Lorem ipsum and filler copy, generic CTAs.
 3. Arbitrary values: no literal px/rem lengths (except the 1px hairline), colours or durations outside `tokens.css`.
 4. Default font tells (Inter, Roboto, Open Sans, Poppins, Lato, Montserrat).
-5. Glassmorphism: no `backdrop-filter`, including the sticky header.
+5. Glassmorphism: `backdrop-filter` only on the sticky header, through `--blur-header`.
 6. Card-in-card nesting: one bordered level at most; never border plus shadow; one radius per component.
 7. Generic layout patterns: no centered hero with two buttons, no 3-icon feature grid, no logo band, no 3-step "how it works".
-8. Decorative motion: no entrance animations, rotating words, pulsing glows, autoplay. Motion is hover, focus and layout feedback only.
+8. Decorative motion: no entrance animations, rotating words, pulsing glows. The dithered backdrop is the one exception: it drifts at about 11 frames a second, only while on screen, and holds still under `prefers-reduced-motion`.
 
 ## Tokens — single source of truth
 
@@ -53,7 +57,8 @@ All eight are active:
 | Spacing (`--space-*`, 4/8 grid) | `src/styles/tokens.css` |
 | Type (`--font-*`, `--text-*`, leading, tracking, weights) | `src/styles/tokens.css` |
 | Radius (`--radius-sm/md/lg/full`) | `src/styles/tokens.css` |
-| Shadow (`--shadow: none`) | `src/styles/tokens.css` |
+| Depth (`--shadow-pop`, `--shadow-glow`, `--blur-header`) | `src/styles/tokens.css` |
+| Backdrops (`--fade-*`, `--glow-accent`, `--sheen`) | `src/styles/tokens.css` |
 | Motion (`--duration-*`, `--ease-*`) | `src/styles/tokens.css` |
 
 **Never use values outside these tokens.** If a value is missing, stop and ask
@@ -84,7 +89,7 @@ Before claiming any UI work done, run:
 pnpm run lint:design
 ```
 
-It catches literal values, gradients, shadows, blur, banned fonts, filler copy,
+It catches literal values, gradients, shadows and blur outside their tokens, banned fonts, filler copy,
 generic CTAs and buzzwords. It must exit 0. Media queries use `em` (custom
 properties cannot appear there), and `<meta name="theme-color">` repeats the
 `--bg` value because HTML attributes cannot read CSS variables.
@@ -92,7 +97,7 @@ properties cannot appear there), and `<meta name="theme-color">` repeats the
 ## Component anatomy
 
 Follow the skill's `component-anatomy.md`: buttons 32/36/44px high, focus 2px
-outline at 2px offset in `--focus`, nav 64px solid with a bottom border, list
+outline at 2px offset in `--focus`, nav 64px, translucent, with a bottom border, list
 rows ≥ 44px, one card level.
 
 ## Copy voice
