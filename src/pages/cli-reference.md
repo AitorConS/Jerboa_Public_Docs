@@ -162,6 +162,15 @@ Graceful stop by default. Idempotent: stopping a VM that is already stopped
 (for example a program that ran to completion and exited on its own) is a no-op
 that succeeds, matching `docker stop`.
 
+A graceful stop asks the guest to power down. Nanos sends `SIGTERM` to the
+program, waits up to 30 seconds for it to exit, and syncs its filesystems,
+including volumes, before powering off. The request reaches the guest as a
+power button press under QEMU and Firecracker on macOS, and over the VM's
+vsock device under Firecracker on Linux, where the daemon kills the VMM if the
+guest has not powered off within 40 seconds. A Linux Firecracker guest kernel
+without the vsock power-down handler cannot take the request; its VMM is
+terminated at once, without a guest-side sync.
+
 Flag:
 
 - `--force`: immediate kill
@@ -356,7 +365,7 @@ byte-for-byte. See the [registry protocol](/registry-protocol/).
 | `logout [registry]` | Forget the stored credential |
 | `tag <image> <target>` | Give a stored image another name, e.g. the reference to push it as |
 | `push <[registry/]namespace/repository[:tag]>` | Push a tagged image; you may push to your GitHub user and to organizations you belong to. `push --index <target> <image>…` tags an image index of images already pushed, one per platform. A trusted publisher's push (GitHub Actions, with the job's OIDC token) is signed with Sigstore (provenance and SBOM attestations); `--sign=false` skips it (v0.57.0 and later) |
-| `pull <[registry/]namespace/repository[:tag\|@digest]>` | Pull an image into the daemon's store; for a tag published for several platforms, this host's, or `--platform linux/amd64\|linux/arm64`. Signed images are kept only if their signatures verify against `--identity <owner/repo[/workflow[@ref]]>`, the rule of `~/.jerboa/policy.json` for the namespace (always one for `jerboa/`), the signer remembered for the repository, or the workflow the registry recorded; the first verified pull remembers the signer, and later pulls refuse another one or an unsigned image. `--verify` also refuses unsigned images (v0.57.0 and later) |
+| `pull <[registry/]namespace/repository[:tag\|@digest]>` | Pull an image into the daemon's store; for a tag published for several platforms, this host's, or `--platform linux/amd64\|linux/arm64`. Signed images are pulled only if their signatures verify, which is checked before anything is downloaded, against `--identity <owner/repo[/workflow[@ref]]>`, the rule of `~/.jerboa/policy.json` for the namespace (always one for `jerboa/`), the signer remembered for the repository, or the workflow the registry recorded; the first verified pull remembers the signer, and later pulls refuse another one or an unsigned image. `--verify` also refuses unsigned images (v0.57.0 and later) |
 | `registry pat create\|ls\|rm` | Manage personal access tokens for CI (`--registry` selects the host; `create` takes `--expires-in <days>`, `--namespace` and `--delete`) |
 | `registry verify <ref>` | Check an image's signatures as a pull does, without pulling or remembering anything, and show its attestations (`--identity`, `--platform` for a tag of several platforms; v0.57.0 and later) |
 | `registry signers` | List the signers pulls remember per repository (`~/.jerboa/signers.json`); `registry signers forget <repo>` forgets one, for a publisher that changed on purpose (v0.57.0 and later) |
@@ -643,7 +652,19 @@ Add `--channel beta` to query the beta channel instead of stable.
 
 The command group currently exposes only one writable key:
 
-- `hypervisor`: `qemu` or `firecracker`
+- `hypervisor`: `auto`, `qemu` or `firecracker`
+
+Without a choice (`auto`, the default) the daemon runs Firecracker wherever
+the host can and QEMU otherwise, and logs which and why when it starts:
+
+| Host | Firecracker is used when |
+|---|---|
+| Linux, and Windows inside the WSL2 distro | `/dev/kvm` opens, a `firecracker` binary is found, and the daemon is root or has `CAP_NET_ADMIN` |
+| macOS | Apple Silicon, macOS 26 or newer, and the bundled `firecracker` is present |
+
+QEMU remains for hosts without KVM and for x86 emulation on Apple Silicon; set
+`hypervisor` to `qemu` for those. A config file that already names a
+hypervisor keeps it.
 
 The config file supports more fields than the CLI subcommand currently edits. The underlying schema in `~/.jerboa/config.toml` also includes:
 
@@ -689,7 +710,7 @@ Flags:
 
 - `--rootfs <tarball>` — use a local rootfs instead of downloading the release
 - `--keep-data` — preserve images, VMs, networks and volumes across the reimport
-- `--hypervisor <qemu|firecracker>` — hypervisor to run after restart
+- `--hypervisor <auto|qemu|firecracker>` — hypervisor to run after restart
 
 ### `jerboa daemon uninstall`
 ### `jerboa daemon start`
@@ -700,7 +721,7 @@ Flags:
 
 Daemon start/restart flag:
 
-- `--hypervisor qemu|firecracker`
+- `--hypervisor auto|qemu|firecracker`
 
 `jerboa daemon logs` flag:
 
@@ -721,7 +742,7 @@ The daemon runs as `root` inside the dedicated distro. The client persists rende
 | `--auth-token` | Deprecated: a token on the command line is visible to other local users in `ps`. Use `--auth-token-file` or `JERBOA_AUTH_TOKEN` |
 | `--insecure` | Allow serving a TCP endpoint without an auth token (unsafe). A TCP endpoint with no token is rejected at startup otherwise; a Unix socket needs no token (it is restricted to the owning user with `0600` permissions) |
 | `--qemu` | QEMU binary path (default `qemu-system-x86_64`) |
-| `--hypervisor` | `qemu` or `firecracker` (overrides `~/.jerboa/config.toml`) |
+| `--hypervisor` | `auto`, `qemu` or `firecracker` (overrides `~/.jerboa/config.toml`; default `auto`: Firecracker where the host can run it, QEMU otherwise) |
 | `--fc-bin` | Firecracker binary path (only with `--hypervisor=firecracker`) |
 | `--fc-kernel` | Firecracker-compatible kernel path (auto-downloaded if omitted) |
 | `--fc-metrics-dir` | Linux only: write each Firecracker VM's device metrics (per-drive bytes, operations, flushes, latency) as JSON lines to `fc-<id>-metrics.json` in this directory, for storage profiling |
