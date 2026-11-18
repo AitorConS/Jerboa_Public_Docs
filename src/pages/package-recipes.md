@@ -69,6 +69,55 @@ under the package's name.
 Each architecture builds on a native runner (`ubuntu-24.04` or
 `ubuntu-24.04-arm`); nothing is cross-compiled.
 
+### Go programs built from source
+
+A release binary carries the Go toolchain and module versions upstream built
+it with, and keeps their known vulnerabilities until upstream releases again.
+`scripts/build-go.sh` builds the program from its source release instead,
+with the toolchain the script pins and with every module listed in
+`scripts/release/go-floor.txt` raised to at least that version. The package
+version adds a revision to the upstream one (`3.15.1-1`), raised whenever
+the package is rebuilt with newer floors.
+
+```json
+{
+  "package": "prometheus",
+  "version": "3.15.1-1",
+  "upstream_version": "3.15.1",
+  "source_url": "https://github.com/prometheus/prometheus/archive/refs/tags/v3.15.1.tar.gz",
+  "sha256": "…",
+  "build_script": "scripts/build-go.sh",
+  "go": {
+    "main": "./cmd/prometheus",
+    "ldflags": "-X github.com/prometheus/common/version.Version={version}",
+    "tags": "netgo,builtinassets",
+    "assets": [{"url": "https://github.com/prometheus/prometheus/releases/download/v3.15.1/prometheus-web-ui-3.15.1.tar.gz", "sha256": "…", "dest": "web/ui"}],
+    "prepare": ["scripts/compress_assets.sh"]
+  }
+}
+```
+
+| `go` field | Meaning |
+|---|---|
+| `main` | The package to build, relative to `dir` (default `.`). |
+| `dir` | The module directory, relative to the source root (default `.`). |
+| `ldflags` | Linker flags; `{version}` is the upstream version. Set them as upstream's release build does, so the program reports the same version. |
+| `tags` | Build tags, comma-separated. |
+| `cgo` | `true` to build with cgo (default `false`). |
+| `env` | More build environment, such as `GOEXPERIMENT`. |
+| `assets` | Archives added to the source before building, each pinned by `sha256`: a web UI upstream publishes prebuilt, for example. Prefer one to building the UI with Node.js. |
+| `node` | `true` when `prepare` builds a web UI with Node.js; the script installs the Node.js release it pins. |
+| `prepare` | Shell commands run in the source root before the build, with `VERSION` set. |
+
+`source_strip` (default 1) is how many leading path parts to drop when
+extracting the source archive.
+
+A floor applies only to programs that already require the module. A module
+with fixes on several release lines lists one version per line; a program
+on one of those lines gets that line's fix, so a program is never moved to a
+new minor release of a module it already pins the older line of. Every
+floor must be at least two weeks old when it is added.
+
 ## The build script contract
 
 The workflow runs the script from the repository root with:
@@ -165,6 +214,34 @@ reviewer, and signs `packages.json` with the release key into
 embeds before it reads the index, and refuses an index without one. An
 index served from this machine (`file://`, or http on loopback, as for a
 local mirror) may be unsigned; it is then accepted with a warning.
+
+The signature's trusted comment must be `packages` or `packages:<run id>`:
+the release key also signs release manifests and toolsets, and none of those
+is accepted as the index. `packages.json` carries a `purpose`
+(`jerboa-package-index`), a `generated` time and a `serial` that
+`package-index.py` raises by one with every publication that adds an entry.
+`jerboa` records the newest serial it accepted per index URL in
+`index-state.json` beside its cached `index.json` and refuses an older index,
+keeping the cached copy, so a superseded `packages.json` restored on the
+release with its original signature is not used. An index without a serial
+(the format before serials) is still accepted, with a deprecation warning,
+until an index with a serial has been accepted from that URL.
+
+The publish job extends only the index whose serial equals the repository
+variable `PKG_INDEX_MIN_SERIAL` (an unset variable counts as 0, and so does an
+index from before serials). An index with a lower serial is a superseded one
+restored on the release and is refused. One with a higher serial means the
+variable was not raised after the last publication: the job stops before
+signing anything and prints the command that raises it
+(`gh variable set PKG_INDEX_MIN_SERIAL --body <serial>`), to run after
+checking that the summary of the last publishing run shows that serial. The
+variable is never lowered.
+
+After a publication the job records the new serial itself when the `release`
+environment holds the secret `PKG_INDEX_VARIABLES_TOKEN`, a token allowed to
+write this repository's Actions variables (the workflow's own token cannot).
+Without that secret it writes the same command to the job summary with a
+warning, and the next publish refuses to run until it was done.
 
 ## Example: adding memcached
 

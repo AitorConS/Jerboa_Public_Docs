@@ -27,22 +27,105 @@ runner timestamp in that API; queue and approval latency are explicitly unknown,
 calculated by subtracting workflow creation time. Compare p50/p95 over a representative
 sample before claiming the 3–5 minute PR target has been achieved.
 
+### Self-hosted KVM runner access
+
+The `if:` guards (head repository must be this one) and `environment: kvm` on the
+KVM jobs are lines of workflow files that a `pull_request` run takes from the pull
+request itself: a fork can delete them, or add a workflow naming
+`[self-hosted, linux, kvm]`. They document intent; they do not enforce it. What
+enforces it is outside the pull request's reach:
+
+- **Runner job-started hook.** Install `scripts/release/kvm-runner-guard.py` and
+  its launcher `kvm-runner-guard.sh` on the runner, with the launcher as the
+  `ACTIONS_RUNNER_HOOK_JOB_STARTED` script (the runner accepts only `.sh`, `.ps1`
+  and `.js` hooks) and `JERBOA_KVM_REPOSITORY=AitorConS/jerboa` (see the
+  script's header). Before any step
+  of a job it refuses pull requests whose head is another repository, events other
+  than push, pull_request, workflow_dispatch and schedule, and workflows other than
+  `main.yml`, `release.yml` and `nightly.yml`. Reinstall it from main when it
+  changes: the candidate's `kernel-test` job compares the installed copy with the
+  revision being released (`kvm-runner-guard.py check-installed`) and fails with
+  the install command when they differ. A unit test fails when a workflow with
+  KVM jobs is missing from its list.
+- **Settings > Actions > General:** "Require approval for all external
+  contributors" for fork pull request workflows.
+- **Environment `kvm`:** required reviewer (the owner), so same-repository pull
+  request jobs wait for a review of the revision they run.
+- **Runner:** dedicated to this repository, not shared with other repositories;
+  preferably ephemeral (`--ephemeral`, re-registered per job). While it is
+  persistent, a job can leave state for the next one, which is why release
+  assembly trusts no artifact a KVM job could replace (see
+  [Promote](#promote)).
+
 Kernel host tests are required in full CI and also run nightly on hosted Linux: they do not use KVM. For diagnosis,
 manual `nightly.yml` dispatch accepts `suite: kernel`; scheduled/default runs still
 execute all suites. Native Mac validation remains manual and distribution remains
 preview, as selected for this rollout.
 
+### Upgrade tests
+
+Two layers show that an installed machine survives the next release.
+
+**State compatibility, with the unit tests.** `internal/upgradetest/testdata`
+holds what released versions left on disk: `scripts/upgrade/make-fixture.py`
+runs the released `jerboa` and `jerboad` (downloaded and checked against that
+release's signed manifest) through a fixed scenario and packs their home
+directories together with what that version reported about them. The tests in
+`internal/upgradetest`, `internal/release` and `cmd/jerboad` restore that state
+and require the current stores, daemon and CLI to show the same images, names,
+VMs, volumes, networks, snapshots, compose project, credentials and settings,
+also after a first start interrupted at every write, a half-finished migration
+and damaged files. A fixture is restored where it was recorded
+(`/var/tmp/jerboa-upgrade-fixture`), because the state names absolute paths.
+
+Record a fixture for every release, once it is published:
+
+```sh
+scripts/upgrade/make-fixture-docker.sh v0.60.0     # Linux, in a container
+python3 scripts/upgrade/make-fixture.py --version v0.60.0 \
+    --bin-dir ".../Jerboa Desktop.app/Contents/Resources/bin" \
+    --out internal/upgradetest/testdata             # macOS 26, natively
+```
+
+Keep the older ones: each is an upgrade path. `TestFixturesCoverTheLatestRelease`
+fails once `VERSION.md` is more than one minor version ahead of the newest
+Linux fixture, so the version bump of the release after a forgotten one does
+not pass CI.
+
+**A real upgrade, on the KVM runner.** The `Upgrade from stable` job of
+`validate.yml` (full validation: main, release candidates, and pull requests
+that touch the installer, the workflows or `tests/upgrade/`) boots a disposable
+virtual machine and, inside it, installs the current stable release with the
+public installer, creates an image, a VM with a volume and a compose project,
+upgrades to the build under test with that build's `scripts/install.sh`,
+checks that everything is still there and works, then goes back to stable and
+forward again (`tests/upgrade/guest.sh`). The build under test is served from a
+release origin made inside the machine, signed with a key generated for the
+run; the installer is used unchanged except for the key it trusts. Nothing is
+installed on the runner: `tests/upgrade/run.py` only writes inside its `--work`
+directory. A release candidate cannot be built while this job fails.
+
 ## Prepare a candidate
 
 1. Merge validated engine and Desktop changes. Choose exact 40-character Desktop
-   and Firecracker commits. The runtime SHA must have passed the native runtime tests.
-2. Update `VERSION.md` to a **new** version if the intended stable bytes differ from
-   any already-published version. Merge that change; it does not publish.
+   and Firecracker commits. The candidate refuses a `runtime_sha` that is not on
+   the main branch of `AitorConS/firecracker-macos` or whose check runs did not
+   all succeed.
+2. Run `python3 scripts/release/prepare-release.py X.Y.Z` and merge the result.
+   It names the `Unreleased` section of `CHANGELOG.md` after the version (dated
+   today in UTC, or `--date`), opens a new empty `Unreleased`, adds the version's
+   link definition and writes `VERSION.md`. Use a **new** version whenever the
+   intended stable bytes differ from an already-published version. Merging does
+   not publish. The changelog entry is the release's notes: the candidate refuses
+   a version without one, naming this command, and carries the entry as
+   `releases/<v>/notes.md` in its signed inventory.
 3. Select the Linux kernel toolset explicitly:
    - For kernel changes, update `kernel/VERSION` to a new version and merge it.
      Choose `kernel_source: build` (the default) and provide that version with a
      `v` prefix. The workflow stages the same-run validated Linux kernel build;
-     it never substitutes the currently published kernel.
+     it never substitutes the currently published kernel. `kernel-stage` fails,
+     before any boot test or packaging, when that version is already published
+     with other bytes or is older than the published one.
    - For a release intentionally reusing the published Linux tools, choose
      `kernel_source: stable` and their exact published version. The signed stable
      manifest and every downloaded file are verified. Do not use this option
@@ -57,11 +140,42 @@ preview, as selected for this rollout.
    The installer smoke runs on a Windows machine started for this run only (see
    [Windows installer smoke](#windows-installer-smoke)); assembly waits for it.
 6. Download `release-candidate` and `macos-app` from the run. The candidate includes a
-   signed manifest, a signed inventory with source revisions, exact payload hashes,
-   and a generated Windows update feed. Stable remains unchanged.
+   manifest signed for the `candidate` channel, a signed inventory with source
+   revisions, exact payload hashes, and a generated Windows update feed. Stable
+   remains unchanged: clients and `install.sh` only accept a manifest whose channel
+   is `stable`, and only promotion signs one, so an unpromoted or rejected candidate
+   cannot be served to them as a release.
 7. Run native Mac tests on the candidate app using `scripts/release/native-macos.sh`.
-   Preserve the JSON result with the candidate run ID and app archive hash in a
-   reviewable HTTPS report. A hosted Mac VM does not provide Hypervisor.framework.
+   Commit the JSON result as `docs/releases/<version>/native-macos.json` on main
+   (with its log and the record of the release, which links to the changelog
+   entry instead of repeating the notes). Promotion reads it from there. A hosted
+   Mac VM does not provide Hypervisor.framework.
+
+### What the candidate decides by itself
+
+Nothing below is entered or remembered by the operator; the `inputs` job
+(`candidate.py lock`) does it and the later jobs enforce it.
+
+- **Stable floor.** `lock` downloads the live stable manifest, verifies its
+  signature and records its `generated` time as `min_stable_generated`. Every
+  `jerboa` and `jerboad` of the candidate is linked with
+  `-X …/internal/release.MinStableGenerated=<that time>`, so a released client
+  with no state of its own refuses any stable manifest older than the one that
+  was live when its release was built. Assembly looks for the value in each CLI
+  and daemon binary of each platform and refuses one that lacks it; the signed
+  inventory records it. `lock` fails if the value committed in
+  `internal/release/freshness.go` (the fallback of builds from source) is later
+  than the live manifest, which would make source builds refuse stable: lower it
+  in a pull request and build again.
+- **Pipeline generation.** The inventory records `candidate.PIPELINE`. Promotion
+  accepts only candidates of its own generation, so one assembled before a
+  pipeline change is rebuilt instead of being promoted by mistake. Whoever
+  changes what a candidate must contain bumps the number; a test pins the
+  inventory's fields to it and fails when they change without a bump.
+- **Release notes.** The changelog entry of the version (see step 2).
+- **Runner guard.** See [Self-hosted KVM runner access](#self-hosted-kvm-runner-access).
+- A version that is not newer than the published one only gets a warning: such a
+  candidate can be built to exercise the pipeline, and promotion refuses it.
 
 Candidates currently retain artifacts for 30 days (platform intermediates use the
 repository default unless overridden). Expired candidates must be rebuilt and
@@ -107,18 +221,38 @@ To run the smoke by hand, use a Windows machine with WSL2 and follow the steps o
 
 Dispatch **Promote release** (`promote.yml`) on main with the successful candidate run
 ID and the URL of native Mac test evidence. The `release` environment must require
-an owner review. The reviewer checks that the evidence identifies the exact run and
-app hash (matching `inventory.native_macos_app.sha256`), and that installation/VM creation/stop completed successfully. This is an
-explicit transitional human gate, not an automated claim of native validation.
+an owner review. Promotion itself checks that
+`docs/releases/<version>/native-macos.json` in its checkout names this candidate
+run, the hash of its app archive (`inventory.native_macos_app.sha256`), its
+version and `"result": "pass"`, and refuses to publish otherwise; the reviewer
+judges what the report says was tested. Running the native tests remains a
+manual step, not an automated claim of native validation.
 
 The coordinator rejects a failed/non-main candidate, wrong workflow, mixed versions,
 missing platforms, invalid signatures, changed bytes, an older version, or a previously
 published version with another manifest. Production paths remain compatible with old
 clients, including `desktop/jerboa-desktop-setup-X.Y.Z.exe`.
 
-Promotion uploads immutable objects, records a signed receipt, verifies public artifact
-downloads, then updates `channels/stable.json`, its detached signature, and
-`desktop/latest.yml`. The final step dispatches `Jerboa_Docs/release-sync.yml`, which
+It also rejects, before writing anything and with a message that says to
+rebuild the candidate (dispatch **Build release candidate** again on main, repeat
+the native Mac validation on the new run, promote that run):
+
+- a candidate of another pipeline generation, or without a recorded stable floor
+  or release notes;
+- a candidate whose stable floor is older than the live stable manifest, that is,
+  one built before the release that is now live was promoted: its binaries would
+  accept a replay of the manifests that release replaced. A retry of the same
+  candidate after a partial promotion is exempt.
+
+Promotion signs the stable manifest only after its checks pass: the candidate's
+manifest with its channel changed to `stable` and nothing else (the generation time
+stays the candidate's, so a retry re-creates the same bytes and signature). It
+uploads immutable objects, including that manifest as `releases/<v>/manifest.json`
+and the candidate's as `releases/<v>/candidate-manifest.json`, records a signed
+receipt, verifies public artifact downloads, then updates `channels/stable.json`,
+its detached signature, and `desktop/latest.yml`. The release notes are published as
+`releases/<v>/notes.md`. Candidates assembled before this
+change carry a stable signature of their own and are refused; rebuild them. The final step dispatches `Jerboa_Docs/release-sync.yml`, which
 checks signed published metadata, verifies both download URLs, preserves existing
 editorial notes and commits generated metadata. Verify the website workflow and Vercel
 status separately; successful dispatch means queued, not deployed.
@@ -133,8 +267,11 @@ The Linux download toolset and WSL rootfs contain the same selected `mkfs`,
 rootfs archive and verifies each embedded tool against the selected toolset.
 The manifest's kernel version and the distro's kernel version must agree.
 Native Mac continues to carry its source-built ARM64 kernel and native tools,
-validated using the candidate app on a physical Mac. Linux x86_64 tools are never
-substituted into the Mac app.
+validated using the candidate app on a physical Mac. Linux x86_64 host tools are
+never substituted into the Mac app. Its x86 guest boot files (`tools/x86`, used only
+for explicitly emulated linux/amd64 images) are the candidate's selected
+`boot.img` and `kernel.img`, staged by `build-macos` from the verified
+`selected-kernel` artifact; the job never fetches them from the live stable channel.
 
 The signed inventory includes the selection mode, engine SHA, candidate run,
 per-file hashes and QEMU/Firecracker boot evidence bound to those hashes. The
@@ -142,6 +279,19 @@ boot job verifies bytes before and after execution; assembly and promotion check
 the same identity again. The complete rootfs and installers are also hashed.
 Promotion uploads the candidate's existing bytes, including new kernel paths,
 before updating stable. It neither builds a kernel nor resolves one from stable.
+
+Artifacts of a run share one namespace, which the run's self-hosted KVM jobs can
+also write to, and are downloaded by name. Each GitHub-hosted job that uploads an
+artifact a later trusted job uses therefore records its digest
+(`scripts/release/artifact-digest.py record`) as a job output, which no other job
+can set, and the consumer checks the download against it before using, executing
+or signing anything (`verify`; `validate.yml` exports `kernel_linux_sha256` for
+`kernel-linux`). Assembly downloads every artifact by its own name, never by
+pattern. The KVM runner's `validated-kernel` is not trusted on its own: it must
+equal the verified `selected-kernel` apart from its boot report. A missing or
+different digest fails the job; rebuild the candidate rather than re-running only
+the consumer. The release binaries assembly runs for their version check get an
+environment without the signing seed or other credentials.
 
 ## Reattempts and partial failures
 
@@ -175,6 +325,22 @@ release origin and channel, the newest `generated` they accepted (in
 field once a dated one was seen. A restored old manifest is therefore refused by
 clients that saw a newer one: an emergency rollback means re-signing the old content
 as a new candidate, not republishing the old manifest bytes.
+
+Clients with no state of their own (a first run, or `~/.jerboa` lost) still have a
+floor for the stable channel: `release.MinStableGenerated`, compiled into the binary,
+and the generation time `install.sh` recorded in `/etc/jerboa/release-state.json`,
+whichever is newer. A stable manifest older than that floor, or without
+`generated`, is refused. Release binaries get the floor from the candidate
+workflow: the generation time of the stable manifest that was live when the
+candidate was built (see
+[What the candidate decides by itself](#what-the-candidate-decides-by-itself)).
+Nobody raises it by hand. The value committed in `internal/release/freshness.go`
+only reaches builds from source; it is the engine commit time of a promoted
+release (`TZ=UTC git log -1 --date=iso-strict-local --format=%cd <sha>`) and may
+be raised to that of a newer one, never beyond the live stable manifest's
+`generated` (the candidate workflow refuses that). There is no maximum age:
+releases are irregular and a floor that expired would stop offline mirrors and
+old installs.
 
 Mac continues to use ad-hoc signatures and the documented preview installation flow.
 Production Developer ID/notarization requires a certificate and Apple credentials;
@@ -222,7 +388,10 @@ Native Mac validation and owner approval of `release` remain required.
 `packages.yml` runs independently on changed recipes or a manual package selection.
 Builds use isolated hosted Linux machines and `fail-fast: false`. Package failures do
 not turn a successful product promotion red. Pushes validate recipes without publishing. The index is updated only when selected
-builds succeed on a manual run with `publish: true`. Existing package-index storage is retained; migrating package archives
+builds succeed on a manual run with `publish: true`. The publish job extends only the
+index whose serial equals the repository variable `PKG_INDEX_MIN_SERIAL` and records
+the new serial there afterwards, or stops the next publish until it is recorded
+(see [Package recipes](/package-recipes/)). Existing package-index storage is retained; migrating package archives
 to immutable per-recipe revisions is a separate format migration, not a product-release
 side effect.
 
