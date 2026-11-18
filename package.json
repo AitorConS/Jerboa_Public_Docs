@@ -9,6 +9,7 @@
     "build": "node scripts/sync-docs.mjs --if-present && astro build",
     "docs:sync": "node scripts/sync-docs.mjs",
     "docs:check": "node scripts/sync-docs.mjs --check",
+    "docs:anchors": "node scripts/check-anchors.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "lint:design": "node scripts/lint-design.mjs"

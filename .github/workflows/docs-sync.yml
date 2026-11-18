@@ -1,11 +1,13 @@
 name: docs-sync
+concurrency:
+  group: docs-sync
+  cancel-in-progress: false
 on:
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
 permissions:
   contents: write
-  pull-requests: write
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -22,12 +24,21 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: JERBOA_SOURCE=engine pnpm run docs:sync
-      - uses: peter-evans/create-pull-request@v7
-        with:
-          commit-message: 'docs: sync from jerboa engine'
-          title: 'docs: sync from jerboa engine'
-          body: 'Regenerated documentation snapshot from AitorConS/jerboa docs.'
-          branch: chore/docs-sync
-          add-paths: |
-            src/pages/*.md
-            src/data/docs.json
+      # The snapshot is published only if the site builds from it and every
+      # link in it lands on a heading that exists.
+      - run: JERBOA_SOURCE=engine pnpm run build
+      - run: pnpm run docs:anchors
+      # Straight to main: the pages are a copy of what is already reviewed and
+      # merged in the engine repository. A pull request here waited for an
+      # approval nobody was asked for, and the site fell behind the releases.
+      - name: Publish the snapshot
+        run: |
+          git add -A -- src/pages src/data/docs.json
+          if git diff --cached --quiet; then
+            echo "The site already matches the engine's docs."
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'docs: sync from jerboa engine'
+          git push origin HEAD:main
