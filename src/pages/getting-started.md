@@ -36,8 +36,8 @@ Required for native execution:
 
 Optional:
 
-- `/dev/kvm` for accelerated QEMU; without it, QEMU runs with TCG emulation
-- Firecracker if you want `--hypervisor firecracker`
+- `/dev/kvm`: with it the daemon runs Firecracker; without it, QEMU with TCG emulation (slower)
+- Firecracker, which the installer adds; a daemon started by hand uses it when it is on `PATH`
 - kernel build toolchain (`gcc-multilib`, `nasm`, `qemu-utils`) only if you build the kernel/toolchain locally
 
 ### Windows
@@ -204,7 +204,7 @@ flags) unless later custom build args override them.
 
 ```bash
 jerboa build examples/flaskapp --name flaskapp --port 8080
-jerboa build examples/nextapp --name nextapp --port 3000
+jerboa build examples/nextapp --name nextapp --port 3000 --allow-build-network
 ```
 
 Supported build modes:
@@ -285,8 +285,11 @@ jerboa run myapp:latest --network app --ip 10.100.0.10 -p 8080:80
 Important (Linux and Windows):
 
 - `-p/--port` requires `--network`
-- TCP forwarding works today
-- UDP port mappings are accepted syntactically but are currently skipped by the forwarder with a warning
+- TCP and UDP ports are published through kernel NAT (nftables), the default
+  on Linux where it is available
+- On WSL2, with `jerboad --port-publish proxy`, or where kernel NAT is missing,
+  the userspace proxy forwards TCP only and skips UDP mappings with a warning
+  (see [Published ports on Linux](/cli-reference/#published-ports-on-linux))
 
 **macOS:** `-p` works without `--network`, and both TCP and UDP ports are
 forwarded. Firecracker VMs cannot reach the internet unless you allow it. See
@@ -314,7 +317,15 @@ daemon installs nftables rules (tables `inet jerboa_guard` and
 `bridge jerboa_guard`) that keep guests away from the host's `127.0.0.1`, stop
 traffic routed between two Jerboa networks, let hosts outside reach guests only
 through published ports, and drop frames a guest sends with another guest's MAC
-or IP address. Without `nft` the daemon logs a warning and runs without them.
+or IP address. Without `nft` the daemon logs a warning and runs without them,
+and published ports then use the userspace proxy only. The daemon checks the
+tables every few seconds and reinstalls them when a firewall reload removed
+them (`flush ruleset`, as the stock `/etc/nftables.conf` does). Kernel NAT for
+published ports sets `route_localnet` on a bridge only while the loopback rule
+is loaded; while the tables cannot be reinstalled the daemon turns it off
+again: guests never reach the host's loopback, and if the `ip jerboa` NAT table
+is still loaded, host clients connecting through `127.0.0.1` cannot reach the
+ports it translates until the guard is back.
 IPv4 forwarding (`net.ipv4.ip_forward`) stays enabled host-wide while networks
 are in use.
 
@@ -352,8 +363,15 @@ How it works:
   daemon owns; guests reach it through their default gateway
 - queries are scoped by source IP, so `db` resolves to the `db` VM **on the
   caller's own network**
+- names match in any letter case (`DB`, `db.APP`), as DNS names do; a name of
+  the caller's network (VM name, ID or alias, shared aliases included) is
+  answered by the daemon for every record type and never forwarded: a type
+  the VM has no record of gets an empty answer
 - names the daemon does not own are forwarded to an upstream resolver, so
-  ordinary internet lookups still work
+  ordinary internet lookups still work. A guest can have a limited number of
+  forwarded questions outstanding; beyond that its further forwarded questions
+  are dropped (DNS clients retry), while names of its network are still
+  answered
 - the same mechanism powers `compose` — services connect to each other by
   service name (see [Compose](/compose/))
 
@@ -400,9 +418,27 @@ jerboa compose down stack.yaml --volumes
 
 ---
 
+## Checking and cleaning up
+
+```bash
+jerboa doctor                   # is this machine, the daemon and its data in order?
+jerboa system df                # disk space by kind, and how much nothing uses
+jerboa system prune --dry-run   # what a cleanup would remove
+jerboa system prune             # remove what nothing refers to any more
+```
+
+`doctor` changes nothing and says what to do about each problem. `system
+prune` removes only what you can no longer name unless you add `--vms`, `-a`
+or `--volumes`; it lists what it will remove and asks first. See
+[Maintenance commands](/cli-reference/#maintenance-commands).
+
+---
+
 ## Updating
 
-Update CLI and daemon together for 0.51.2: this release uses wire protocol 2.
+Update the CLI and the daemon together: they must speak the same wire protocol
+(3 today), and the CLI reports a mismatch instead of sending commands the
+daemon would misread.
 Before upgrading existing Compose stacks, follow the [stack migration instructions](/compose/#upgrading-existing-stacks).
 
 The CLI has no self-update command. How you update depends on the platform:
@@ -423,6 +459,30 @@ jerboa version          # installed CLI/kernel vs latest of every component
 jerboa kernel check     # is a newer kernel available?
 jerboa kernel update    # install the latest kernel toolchain
 ```
+
+---
+
+## Uninstalling
+
+Uninstalling removes Jerboa and everything it stored: images, VMs, volumes,
+snapshots, registry credentials and settings. Back up what you need first.
+
+- **Windows** — uninstall **Jerboa Desktop** from Windows Settings. It removes
+  the app, the `jerboa` WSL distro, the `.jerboa` folder in your user profile
+  and the CLI from your PATH.
+- **macOS** — in Jerboa Desktop, open **Settings → Uninstall**. Moving the app
+  to the Trash instead leaves the engine's service, `~/.jerboa` and the
+  commands in `/usr/local/bin` behind.
+- **Linux** — run the installer with `--uninstall`:
+
+  ```sh
+  curl -fsSL https://jerboa.dev/install.sh | sudo bash -s -- --uninstall
+  ```
+
+  It stops and removes the `jerboad` service, the binaries, the `jerboa` system
+  user, `/var/lib/jerboa`, `/etc/jerboa` and your `~/.jerboa`. Add `--keep-data`
+  to remove only the programs and the service. Packages the installer added
+  with `apt` (QEMU, iptables…) are left in place.
 
 ---
 
