@@ -10,7 +10,7 @@ source: "macos-firecracker.md"
 Jerboa supports the native ARM64 Hypervisor.framework backend from the sibling
 `../firecracker-macos` checkout. Use its signed macOS executable, not an upstream
 Linux Firecracker binary. The fork requires macOS 26 and Apple Silicon; this
-integration was exercised on the local M5 host. Source configurations retain QEMU as the default; the native package installer selects Firecracker.
+integration was exercised on the local M5 host. The default engine, `auto`, is Firecracker wherever the VMM is found beside the daemon, on `PATH` or at `JERBOA_FIRECRACKER_BIN`, and QEMU otherwise.
 
 ## Install a published native release
 
