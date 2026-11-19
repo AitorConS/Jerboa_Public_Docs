@@ -3,41 +3,63 @@ concurrency:
   group: docs-sync
   cancel-in-progress: false
 on:
+  # The engine repository cannot start a workflow here without a credential
+  # of its own, so this one asks every 15 minutes. A run that finds nothing
+  # new stops after the comparison, before installing anything.
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: AitorConS/jerboa
           path: engine
-      - uses: pnpm/action-setup@v4
+          sparse-checkout: |
+            /docs/
+            /kernel/VERSION
+            /VERSION.md
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+      # The sync script uses only Node's standard library, so the comparison
+      # needs no install.
+      - name: Compare with the engine's docs
+        id: diff
+        run: |
+          JERBOA_SOURCE=engine node scripts/sync-docs.mjs
+          git add -A -- src/pages src/data/docs.json
+          if git diff --cached --quiet; then
+            echo "The site already matches the engine's docs."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff --cached --stat
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: pnpm/action-setup@v4
+        if: steps.diff.outputs.changed == 'true'
       - run: pnpm install --frozen-lockfile
-      - run: JERBOA_SOURCE=engine pnpm run docs:sync
+        if: steps.diff.outputs.changed == 'true'
       # The snapshot is published only if the site builds from it and every
       # link in it lands on a heading that exists.
       - run: JERBOA_SOURCE=engine pnpm run build
+        if: steps.diff.outputs.changed == 'true'
       - run: pnpm run docs:anchors
+        if: steps.diff.outputs.changed == 'true'
       # Straight to main: the pages are a copy of what is already reviewed and
       # merged in the engine repository. A pull request here waited for an
       # approval nobody was asked for, and the site fell behind the releases.
       - name: Publish the snapshot
+        if: steps.diff.outputs.changed == 'true'
         run: |
           git add -A -- src/pages src/data/docs.json
-          if git diff --cached --quiet; then
-            echo "The site already matches the engine's docs."
-            exit 0
-          fi
           git -c user.name='github-actions[bot]' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
               commit -m 'docs: sync from jerboa engine'
