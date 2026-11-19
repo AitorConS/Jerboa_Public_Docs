@@ -201,6 +201,9 @@ Flag:
 
 - `--signal`, default `SIGTERM`
 
+The signal is a name (`SIGTERM`, `SIGINT`, `SIGKILL`, `SIGHUP`, `SIGQUIT`,
+`SIGUSR1`, `SIGUSR2`) or a number as the daemon's host numbers it.
+
 ---
 
 ## Image Commands
@@ -294,20 +297,49 @@ Build driver behavior to know:
   `[build] install_scripts = true` for dependencies that need their install scripts.
 - Build steps (`[build] run`, `npm`, `pip`, `cargo`, `go build`) run without
   Jerboa's own credentials in their environment (`JERBOA_REGISTRY_TOKEN`,
-  `JERBOA_AUTH_TOKEN` and the other `JERBOA_*` tokens), nor GitHub Actions'
-  `ACTIONS_ID_TOKEN_REQUEST_*`, with which a job requests OIDC tokens.
+  `JERBOA_AUTH_TOKEN` and every other `JERBOA_*` variable whose name holds
+  `TOKEN` or `SECRET`, and `JERBOA_MINISIGN_SEED`), nor GitHub Actions'
+  `ACTIONS_ID_TOKEN_REQUEST_*`, with which a job requests OIDC tokens, nor
+  well-known tokens and keys: `GITHUB_TOKEN`, `GH_TOKEN`,
+  `GH_ENTERPRISE_TOKEN`, `GITHUB_ENTERPRISE_TOKEN`, `AWS_ACCESS_KEY_ID`,
+  `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `AWS_SECURITY_TOKEN`,
+  `AWS_WEB_IDENTITY_TOKEN_FILE`, `GOOGLE_APPLICATION_CREDENTIALS`,
+  `GOOGLE_CREDENTIALS`, `CLOUDSDK_AUTH_ACCESS_TOKEN`, `AZURE_CLIENT_SECRET`,
+  `AZURE_CLIENT_CERTIFICATE_PASSWORD`, `AZURE_CLIENT_CERTIFICATE_PATH`,
+  `AZURE_PASSWORD`, `AZURE_FEDERATED_TOKEN_FILE`, `AZURE_STORAGE_KEY`,
+  `AZURE_STORAGE_CONNECTION_STRING`, `AZURE_STORAGE_SAS_TOKEN`,
+  `VAULT_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_API_KEY`,
+  `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`. There is no setting that passes
+  one of these through. A build that needs a token to fetch private
+  dependencies gets it under the name its package manager reads, which is
+  passed: for example `NODE_AUTH_TOKEN="$GITHUB_TOKEN" jerboa build .` with
+  an `.npmrc` that uses `${NODE_AUTH_TOKEN}`, or `NPM_TOKEN`,
+  `CARGO_REGISTRIES_<NAME>_TOKEN`, `~/.netrc` or `~/.git-credentials`.
 - Build steps run in a sandbox: bubblewrap (`bwrap`) on Linux, `sandbox-exec`
   on macOS. A confined step reads the host but writes only to the project
   directory, a private temporary directory (`TMPDIR`) and caches that belong
   to Jerboa, not the tools' own: `npm`, `node-gyp`, `pip`, `go-build`,
-  `go-mod`, `cargo` and `xdg` under `<user cache dir>/jerboa/build-sandbox/`,
-  where the tools are pointed with `npm_config_cache`, `npm_config_devdir`,
+  `go-mod`, `cargo` and `xdg` under
+  `<user cache dir>/jerboa/build-sandbox/<project>/`, where `<project>` is
+  derived from the project's real path (symlinks resolved) and directory
+  (one created where a removed project was gets fresh caches; caches not
+  used for 30 days are removed by the next build), and where the
+  tools are pointed with `npm_config_cache`, `npm_config_devdir`,
   `PIP_CACHE_DIR`, `GOCACHE`, `GOMODCACHE`, `CARGO_HOME` and
-  `XDG_CACHE_HOME`. Your `~/.npm`, `~/.cargo` and Go caches are therefore
-  neither written nor reused (the first confined build downloads again), and
-  your cargo configuration and registry credentials are copied in. It cannot
+  `XDG_CACHE_HOME`. Each project has caches of its own, so one project's
+  build scripts cannot alter the modules or crates another project's build
+  compiles. Your `~/.npm`, `~/.cargo` and Go caches are therefore neither
+  written nor reused (the first confined build of each project downloads
+  again), and your cargo configuration and registry credentials are copied
+  in. A project's caches stay until you delete them. It cannot
   connect to the daemon's or the VMs' control sockets, and it cannot read `~/.jerboa`, `~/.aws`,
-  `~/.azure`, `~/.config/gcloud`, `~/.kube`, `~/.docker` or `~/.gnupg`.
+  `~/.azure`, `~/.config/gcloud`, `~/.kube`, `~/.docker`, `~/.gnupg`,
+  `~/.config/gh`, `~/.config/hub`, `~/.vault-token`, `~/.terraform.d` or
+  `~/.pypirc`. `~/.ssh`, `~/.netrc`, `~/.npmrc`, `~/.cargo/credentials*`
+  and `~/.git-credentials` stay readable, for private dependencies; a git
+  credential helper that reads `~/.config/gh` (`gh auth git-credential`)
+  does not work in a build step, so fetch those over SSH or with
+  `~/.git-credentials`.
   `[build] run` commands have no network unless `[build] network = true`;
   the language tools keep it to fetch dependencies. A step that writes
   elsewhere (for example straight to `/tmp`) fails: write under `TMPDIR` or
@@ -322,7 +354,16 @@ Build driver behavior to know:
   socket paths (`DBUS_*_BUS_ADDRESS`, `DOCKER_HOST` and `CONTAINER_HOST`
   are removed from their environment). On macOS they cannot send Apple
   events. The SSH agent stays reachable, for dependencies fetched over SSH;
-  other local sockets do too.
+  other local sockets do too. Each confined step runs in a process group of
+  its own (Linux and macOS), and whatever it leaves running in that group is
+  killed when the step ends.
+- Project files go into the image only as they were when the build listed
+  them. A file that a build step replaces afterwards (for example with a
+  link to a file outside the project), a source link that no longer leads to
+  a file inside the project, and a build output (`go build`, `cargo build`)
+  that is a link fail the build with
+  `did a build step replace it?`. Rerun the build; if it fails again, check
+  what the project's build steps do to that file.
 - `unikernel.toml` comes with the project, as do the commands the sandbox
   confines, so it cannot switch the confinement off on its own:
   `[build] sandbox = false` needs `--allow-unsandboxed` and
@@ -335,6 +376,10 @@ Build driver behavior to know:
   `.env.*`, `.npmrc`, `.pypirc`, `.netrc`, `.aws/`, `.ssh/`, `id_rsa`,
   `id_dsa`, `id_ecdsa`, `id_ed25519`, `*.pem` and `*.key`. Re-include one the
   image needs with a negated pattern in `.unignore`, e.g. `!certs/server.pem`.
+- The daemon accepts a build context of at most 4 GiB and 1,000,000 entries
+  (files, directories and links). Every entry counts 512 bytes toward the
+  size, whatever it holds. The same limits apply to the package files
+  `jerboa volume seed` sends.
 - Python builds cache dependency installs. `pip install` runs only when
   `requirements.txt` or the Python version changes, tracked by
   `packages/.jerboa-deps-stamp`. Delete `packages/` or that stamp file to force
@@ -404,7 +449,7 @@ byte-for-byte. See the [registry protocol](/registry-protocol/).
 
 | Command | Description |
 |---|---|
-| `login [registry]` | Log in with GitHub (device flow: approve the code shown in a browser). `--token <pat>`, or `JERBOA_REGISTRY_TOKEN`, uses a personal access token instead, as CI does |
+| `login [registry]` | Log in with GitHub (device flow: approve the code shown in a browser). `--token-stdin` stores the personal access token read from the first line of standard input instead (`printf '%s\n' "$TOKEN" \| jerboa login --token-stdin`); a CI job can set `JERBOA_REGISTRY_TOKEN` and skip the login. `--token <pat>` still works but is deprecated and prints a warning: a token on the command line is visible in the process list and stays in the shell history |
 | `logout [registry]` | Forget the stored credential |
 | `tag <image> <target>` | Give a stored image another name, e.g. the reference to push it as |
 | `push <[registry/]namespace/repository[:tag]>` | Push a tagged image; you may push to your GitHub user and to organizations you belong to. `push --index <target> <image>…` tags an image index of images already pushed, one per platform. A trusted publisher's push (GitHub Actions, with the job's OIDC token) is signed with Sigstore (provenance and SBOM attestations); `--sign=false` skips it (v0.57.0 and later) |
@@ -708,7 +753,7 @@ Checks that this machine, the daemon and everything the daemon stores are in ord
                        -> jerboa rmi web:latest, then build or pull it again
 ```
 
-What it looks at: the CLI's config and credentials files, hardware virtualization, whether the daemon answers and runs the same version as the CLI, the hypervisor in use, free disk space, and the consistency of images, VMs, volumes, networks and snapshots (names that point at nothing, VMs whose image or volume is gone, records that cannot be read, leftovers of interrupted operations).
+What it looks at: the CLI's config and credentials files, hardware virtualization, whether the daemon answers and runs the same version as the CLI, the hypervisor in use, free disk space, the consistency of images, VMs, volumes, networks and snapshots (names that point at nothing, VMs whose image or volume is gone, records that cannot be read, leftovers of interrupted operations), and on Linux and WSL whether the guest network guard is loaded (`network isolation`; an error while VMs on networks cannot start because of it).
 
 | Flag | Meaning |
 |---|---|
@@ -903,10 +948,10 @@ The daemon runs as `root` inside the dedicated distro. The client persists rende
 | `--log-format` | Log format: `text` (default) or `json` |
 | `--metrics-addr` | HTTP address for Prometheus metrics (e.g. `127.0.0.1:9090`); empty disables metrics. Off loopback it needs an observability token |
 | `--ui-addr` | HTTP address for the web dashboard (e.g. `127.0.0.1:8080`); empty disables it. It needs an observability token, on loopback too |
-| `--observability-token-file` | File (mode `0600`) with the read-only token for metrics and the dashboard (env: `JERBOA_OBSERVABILITY_TOKEN`) |
+| `--observability-token-file` | File (mode `0600`) with the read-only token for metrics and the dashboard (env: `JERBOA_OBSERVABILITY_TOKEN`). When metrics or the dashboard listen off loopback it must be at least 32 characters (`openssl rand -hex 32`), unless `--insecure` is passed |
 | `--trace-addr` | OTLP gRPC address for trace export (e.g. `localhost:4317`); empty disables tracing |
 | `--cluster-addr` | HTTP address for the cluster gossip endpoint (e.g. `:7946`); empty disables cluster. Requires a cluster token |
-| `--cluster-token-file` | File (mode `0600`) with the token shared by all cluster nodes (env: `JERBOA_CLUSTER_TOKEN`) |
+| `--cluster-token-file` | File (mode `0600`) with the token shared by all cluster nodes (env: `JERBOA_CLUSTER_TOKEN`). It must be at least 32 characters (`openssl rand -hex 32`) |
 | `--insecure-cluster` | Serve gossip without a cluster token (unsafe) |
 | `--join` | Comma-separated seed node addresses to join (e.g. `10.0.0.2:7946,10.0.0.3:7946`) |
 
@@ -918,13 +963,30 @@ Environment the daemon reads:
 | `JERBOA_OBSERVABILITY_TOKEN`, `JERBOA_CLUSTER_TOKEN` | The tokens of the flags of the same names |
 | `JERBOA_DNS_UPSTREAM` | Resolver that guest questions for names the daemon does not own are forwarded to (default `1.1.1.1:53`). Set it empty to forward nothing |
 | `JERBOA_QEMU_SANDBOX=off` | Linux: run QEMU without its seccomp sandbox. By default QEMU runs with `-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny` when the binary supports it |
-| `JERBOA_GUEST_HOST_ACCESS=1` | macOS QEMU: let guests reach the Mac's loopback through the gateway, and private addresses. Off by default |
+| `JERBOA_ALLOW_UNGUARDED_NETWORK=1` | Linux: let VMs on networks start while the guest network guard (nftables) is not loaded. Without it such VMs fail to start until `nft` works. Guests then run without isolation: see [Network isolation](/getting-started/#network-isolation-linux) |
+| `JERBOA_GUEST_HOST_ACCESS=1` | macOS QEMU: let guests reach the Mac's loopback through the gateway, and private addresses. Linux: let guests open connections to the host's addresses (not its loopback) and to private, shared and link-local addresses outside their network. Off by default |
 | `JERBOA_FIRECRACKER_SECURITY` | macOS: the policy file of `--fc-security`, for a daemon started with `jerboa daemon start` |
+| `JERBOA_PULL_MAX_BLOBS` | Most files one pulled image may list (default `100000`) |
+| `JERBOA_PULL_MAX_BYTES` | Most bytes those files may add up to (default `64G`; a number of bytes, or with a `k`, `m` or `g` suffix) |
+| `JERBOA_PULL_MAX_DISK_SIZE` | Largest disk a pulled image may have, and largest VM disk it may ask for (default `64G`) |
+
+None of these reach the programs the daemon starts. QEMU, Firecracker and
+`mkfs` get only `PATH`, `HOME`, `USER`, `LOGNAME`, `TMPDIR`, `TMP`, `TEMP`,
+`LANG`, `LANGUAGE`, `LC_*` and `TZ` from the daemon's environment; a variable
+set for the daemon to pass on to QEMU (a library path, a debug setting) no
+longer gets there. The host networking tools (`ip`, `nft`, `iptables`,
+`sysctl`) get the rest of the environment without any `JERBOA_` variable
+whose name contains `TOKEN` or `SECRET`. On Linux, `mkfs` is started without
+the daemon's network capabilities, like QEMU and Firecracker.
 
 Connections are limited before they authenticate: at most 64 handshakes
 pending in total and 8 per peer, 5 seconds to complete one, and a 500 ms delay
-after a failed one. A client beyond the limit is answered `daemon busy: too
-many connections waiting to authenticate; retry shortly`.
+after a failed one. A ninth connection from one peer closes that peer's oldest
+pending one and takes its place, so idle connections cannot lock out a client
+that authenticates promptly. When all 64 are taken, a client is answered
+`daemon busy: too many connections waiting to authenticate; retry shortly`;
+`jerboa` and `jerboa-agent` retry that four times within about two
+seconds before reporting it.
 
 Observability and store flags (`--metrics-addr`, `--ui-addr`, `--trace-addr`,
 `--log-format`, `--vm-log-max-bytes`, `--vm-store`) are covered in more detail in

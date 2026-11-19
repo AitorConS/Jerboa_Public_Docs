@@ -398,8 +398,11 @@ and restart the daemon.
 
 The daemon holds a limited number of connections that have not yet proved
 they have the token: 64 in total and 8 from one peer, each with 5 seconds to
-finish. Many commands started at the same moment, a script in a tight loop, or
-a client with the wrong token retrying, fill it.
+finish. A new connection from a peer that already has 8 closes the oldest of
+them instead, so this message means all 64 are taken. Many commands started
+at the same moment from different peers, or clients with the wrong token
+retrying, fill it. `jerboa` retries a few times within about two seconds
+before showing the message.
 
 **Fix**: retry. If it persists, look for the process that keeps connecting
 with a wrong or missing token (`[daemon] token` in `~/.jerboa/config.toml`, or
@@ -580,6 +583,22 @@ spaces or other characters that earlier versions accepted are now refused.
 **Fix**: rename the service in the compose file. Bring a stack started under
 the old name down with the old file first.
 
+### jerboad says the cluster or observability token is too short
+
+The daemon refuses a cluster token shorter than 32 characters, and an
+observability token shorter than 32 characters when metrics or the dashboard
+listen off loopback, because anyone who reaches the port can try tokens.
+Earlier versions accepted them.
+
+**Fix**: generate a token with `openssl rand -hex 32` and put it where the
+daemon reads it: the `--cluster-token-file` of every node (or
+`JERBOA_CLUSTER_TOKEN`) and restart all of them, or
+`--observability-token-file` / `JERBOA_OBSERVABILITY_TOKEN`. For a daemon
+started by `jerboa daemon start`, set `observability_token` in
+`~/.jerboa/config.toml`, or delete it and a new one is generated. Update your
+Prometheus scrape configuration with the new token. Binding metrics and the
+dashboard to `127.0.0.1` also lifts the observability check.
+
 ### The dashboard asks for the token again after an upgrade
 
 The dashboard's cookie no longer holds the observability token; it holds a
@@ -589,6 +608,12 @@ restarts. Cookies set by earlier versions are not accepted.
 **Fix**: open `/ui/login` and enter the token once. `/metrics` does not take
 the cookie: send the token as `Authorization: Bearer <token>`.
 
+The session is tied to the address the browser signed in from, so the
+dashboard also asks again after your machine's address changes (another
+network, a VPN). A request from an address inside a jerboa network's subnet
+gets 403: open the dashboard from the host or from another machine, not from
+a guest.
+
 ### Console or log output loses colours or cursor movement
 
 `jerboa logs`, `compose logs`, `pkg load` and attach output remove terminal
@@ -596,6 +621,54 @@ control sequences from guest output, so a guest cannot move the cursor, retitle
 the window or write to the clipboard of your terminal.
 
 **Fix**: pass `--raw` to print the output unfiltered when you trust the guest.
+
+### `guest network isolation is not available, so VMs on networks do not start` (Linux)
+
+A VM on a network starts only while the daemon's nftables rules that isolate
+guests are loaded (see
+[Network isolation](/getting-started/#network-isolation-linux)).
+The message carries why they are not: usually `nft not found`, on a host set
+up before the installer added the `nftables` package, or an `nft` error when
+the kernel or another firewall refuses the `jerboa_guard` tables.
+
+**Fix**: install nftables and run the VM again; the daemon loads the rules on
+its own:
+
+```sh
+sudo apt-get install nftables
+jerboa doctor            # network isolation: guest network guard loaded
+```
+
+Running the installer again also installs it. If `nft` is present, the error
+names what it refused. To run guests without isolation instead (not
+recommended: a guest can then spoof other guests and reach the host's
+services), set `JERBOA_ALLOW_UNGUARDED_NETWORK=1` for the daemon:
+
+```sh
+sudo systemctl edit jerboad     # add: [Service]
+                                #      Environment=JERBOA_ALLOW_UNGUARDED_NETWORK=1
+sudo systemctl restart jerboad
+```
+
+### A guest cannot reach a service on the host or the LAN (Linux)
+
+Connections time out from inside the guest to an address of the host (its
+gateway included), to the LAN, a VPN, a Docker network or `169.254.169.254`,
+while public addresses and other guests of its network answer. That is the
+default since the guest network guard keeps guests off the host and off
+private networks (see
+[Network isolation](/getting-started/#network-isolation-linux)).
+
+**Fix**: reach other guests by their address or name on a shared network
+instead of through a port published on the host. If the guest must reach the
+host or private networks, start the daemon with
+`JERBOA_GUEST_HOST_ACCESS=1`:
+
+```sh
+sudo systemctl edit jerboad     # add: [Service]
+                                #      Environment=JERBOA_GUEST_HOST_ACCESS=1
+sudo systemctl restart jerboad
+```
 
 ### Published ports stop answering on `127.0.0.1` (Linux)
 
