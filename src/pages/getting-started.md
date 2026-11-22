@@ -21,7 +21,7 @@ Jerboa currently runs in three ways:
 
 Notes:
 
-- Linux VM execution uses KVM; macOS runs ARM64 images with Firecracker (bundled) or QEMU.
+- Linux VM execution uses KVM; macOS runs ARM64 images with Spark (bundled; Jerboa's Hypervisor.framework fork of Firecracker) or QEMU.
 - Windows support is built around WSL2, not native Windows virtualization.
 
 ## Prerequisites
@@ -71,7 +71,7 @@ Optional:
 On macOS 26+, download the release's Jerboa Desktop DMG
 (`https://releases.jerboa.dev/desktop/vVERSION/jerboa-desktop-VERSION-macos-arm64.dmg`),
 move the app to Applications and open it. It bundles the CLI, the daemon and
-the Firecracker runtime, starts the daemon and offers to add `jerboa` to
+the Spark runtime, starts the daemon and offers to add `jerboa` to
 `/usr/local/bin`.
 
 The DMG is not signed or notarized by Apple yet, so macOS blocks the first
@@ -79,7 +79,7 @@ launch: allow it in **System Settings → Privacy & Security → Open Anyway**.
 
 `install.sh` does not support macOS yet. For step-by-step instructions and the
 differences from Linux, see [Using Jerboa on macOS](/macos-guide/).
-To build from source, see [Firecracker on macOS](/macos-firecracker/).
+To build from source, see [Spark on macOS](/macos-spark/).
 
 ### Linux
 
@@ -332,7 +332,7 @@ Important (Linux and Windows):
   (see [Published ports on Linux](/cli-reference/#published-ports-on-linux))
 
 **macOS:** `-p` works without `--network`, and both TCP and UDP ports are
-forwarded. Firecracker VMs cannot reach the internet unless you allow it. See
+forwarded. Spark VMs cannot reach the internet unless you allow it. See
 [Networking on macOS](/macos-guide/#networking-and-ports).
 
 ### Publish bind address
