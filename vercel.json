@@ -12,6 +12,11 @@
       "permanent": false
     },
     {
+      "source": "/macos-firecracker/",
+      "destination": "/macos-spark/",
+      "permanent": true
+    },
+    {
       "source": "/docs",
       "destination": "https://docs.jerboa.dev/",
       "permanent": true
