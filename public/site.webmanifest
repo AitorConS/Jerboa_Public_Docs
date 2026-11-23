@@ -1,0 +1,24 @@
+{
+  "name": "jerboa documentation",
+  "short_name": "jerboa docs",
+  "description": "How to install jerboa, build unikernel images and run them as Firecracker or QEMU VMs.",
+  "start_url": "/getting-started/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0c0a09",
+  "theme_color": "#0c0a09",
+  "lang": "en-US",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

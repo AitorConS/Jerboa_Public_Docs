@@ -9,7 +9,7 @@
     {
       "source": "/",
       "destination": "/getting-started/",
-      "permanent": false
+      "permanent": true
     },
     {
       "source": "/macos-firecracker/",
@@ -28,7 +28,7 @@
     },
     {
       "source": "/index.html",
-      "destination": "https://docs.jerboa.dev/",
+      "destination": "/getting-started/",
       "permanent": true
     },
     {

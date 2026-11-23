@@ -3,8 +3,9 @@ import Base from './Base.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import docs from '../data/docs.json';
+import { articleImages, breadcrumbItems, organization, seoTitleFor } from '../lib/seo.mjs';
 import type { MarkdownLayoutProps } from 'astro';
-type Props = MarkdownLayoutProps<{ title: string; description?: string; source: string }>;
+type Props = MarkdownLayoutProps<{ title: string; description?: string; seoTitle?: string; source: string }>;
 const { frontmatter, rawContent } = Astro.props;
 
 // The page's own description for search results: the first paragraph after
@@ -53,6 +54,9 @@ const groups = [
 const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.md` === frontmatter.source);
 const group = groups.find(g => g.pages.some(page => `${page.slug}.md` === frontmatter.source));
 const pageUrl = new URL(Astro.url.pathname, Astro.site).href;
+const slug = (frontmatter.source ?? '').replace(/\.md$/, '');
+const pageTitle = seoTitleFor(slug, frontmatter.title, frontmatter.seoTitle);
+const docsHome = new URL('/getting-started/', Astro.site).href;
 // The pages in sidebar order, for the previous and next links under the article.
 const ordered = groups.flatMap(g => g.pages);
 const at = current ? ordered.indexOf(current) : -1;
@@ -65,25 +69,23 @@ const structuredData = [
   {
     '@type': 'TechArticle',
     '@id': `${pageUrl}#article`,
-    headline: frontmatter.title,
+    headline: pageTitle,
     description,
     url: pageUrl,
+    image: articleImages({ markdown: rawContent(), pageUrl, sourceFile: frontmatter.source }),
     inLanguage: 'en',
     isPartOf: { '@id': new URL('/#website', Astro.site).href },
+    publisher: { '@id': organization['@id'] },
     about: { '@type': 'SoftwareApplication', '@id': 'https://jerboa.dev/#software', name: 'jerboa' },
     version: docs.versions.cli,
   },
   {
     '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Documentation', item: new URL('/getting-started/', Astro.site).href },
-      ...(group ? [{ '@type': 'ListItem', position: 2, name: group.title }] : []),
-      { '@type': 'ListItem', position: group ? 3 : 2, name: frontmatter.title, item: pageUrl },
-    ],
+    itemListElement: breadcrumbItems({ pageUrl, pageTitle: frontmatter.title, docsHome }),
   },
 ];
 ---
-<Base title={`${frontmatter.title} — jerboa docs`} description={description} ogType="article" structuredData={structuredData}>
+<Base title={`${pageTitle} — jerboa docs`} description={description} ogType="article" structuredData={structuredData}>
   <Nav active="docs" />
   <div class="wrap docs-grid">
     <aside aria-label="Documentation navigation">
@@ -259,7 +261,9 @@ const structuredData = [
     --astro-code-token-parameter: var(--stone-200);
     --astro-code-token-string: var(--stone-400);
     --astro-code-token-string-expression: var(--stone-400);
-    --astro-code-token-comment: var(--graphic-muted);
+    /* --graphic-muted is 3.8:1 on --surface and is for non-text marks.
+       Comments are text, so they use --text-muted (7.3:1 on --surface). */
+    --astro-code-token-comment: var(--text-muted);
     --astro-code-token-punctuation: var(--text-muted);
     --astro-code-token-link: var(--text);
   }

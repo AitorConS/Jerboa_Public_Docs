@@ -1,7 +1,8 @@
 ---
-// Production never serves this page: vercel.json redirects / to
-// /getting-started/ at the edge. It remains for `astro dev` and `preview`,
+// Production never serves this page: vercel.json permanently redirects /
+// to /getting-started/ (308). It remains for `astro dev` and `preview`,
 // as a bare document so the redirect does not wait for fonts or styles.
+// noindex, so a client that receives the file itself does not index it.
 ---
 <!doctype html>
 <html lang="en">
@@ -10,6 +11,7 @@
     <meta http-equiv="refresh" content="0; url=/getting-started/" />
     <link rel="canonical" href="https://docs.jerboa.dev/getting-started/" />
     <meta name="robots" content="noindex, follow" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <title>jerboa documentation</title>
   </head>
