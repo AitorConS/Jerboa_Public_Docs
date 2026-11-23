@@ -1,3 +1,6 @@
 allowBuilds:
   esbuild: true
   sharp: true
+overrides:
+  # GHSA-g7r4-m6w7-qqqr. vite accepts 0.28 as a peer but astro resolves 0.27.
+  esbuild: ^0.28.1

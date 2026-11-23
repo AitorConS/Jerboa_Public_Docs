@@ -15,7 +15,8 @@
     "lint:design": "node scripts/lint-design.mjs"
   },
   "dependencies": {
-    "@astrojs/sitemap": "^3.7.4",
-    "astro": "^5.18.2"
+    "@astrojs/markdown-remark": "^7.3.10",
+    "@astrojs/sitemap": "^3.7.6",
+    "astro": "^7.4.13"
   }
 }

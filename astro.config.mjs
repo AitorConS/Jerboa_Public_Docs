@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
+import { unified } from '@astrojs/markdown-remark';
 import { pageIndex, sitemapFields } from './src/lib/seo.mjs';
 import { rehypeImgDimensions } from './src/lib/rehype-img-dimensions.mjs';
 
@@ -40,5 +41,7 @@ export default defineConfig({
   // ClientRouter swap has nothing left to download.
   prefetch: { prefetchAll: true, defaultStrategy: 'hover' },
   // Code colours come from the design tokens (see Docs.astro), not from a Shiki theme.
-  markdown: { shikiConfig: { theme: 'css-variables' }, rehypePlugins: [rehypeImgDimensions] },
+  // The remark/rehype processor, as before Astro 7 made Sätteri the default,
+  // so the published HTML and the image-dimension plugin stay the same.
+  markdown: { processor: unified({ rehypePlugins: [rehypeImgDimensions] }), shikiConfig: { theme: 'css-variables' } },
 });
