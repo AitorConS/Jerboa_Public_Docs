@@ -19,7 +19,8 @@ permissions:
 # - publish installs and runs nothing from the repository: it checks the
 #   uploaded snapshot against the hash recorded before the install (so a
 #   snapshot changed later in sync, by the build or anything it installed,
-#   is refused), puts it in place of src/pages and src/data/docs.json on the
+#   is refused), puts it in place of src/pages, src/data/docs.json and
+#   src/data/lastmod.json on the
 #   same commit and pushes to main.
 jobs:
   sync:
@@ -54,14 +55,14 @@ jobs:
         id: diff
         run: |
           JERBOA_SOURCE=engine node scripts/sync-docs.mjs
-          git add -A -- src/pages src/data/docs.json
+          git add -A -- src/pages src/data/docs.json src/data/lastmod.json
           if git diff --cached --quiet; then
             echo "The site already matches the engine's docs."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git diff --cached --stat
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            snapshot=$(cd src && find pages data/docs.json -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+            snapshot=$(cd src && find pages data/docs.json data/lastmod.json -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
             echo "Snapshot: $snapshot"
             echo "snapshot=$snapshot" >> "$GITHUB_OUTPUT"
           fi
@@ -82,6 +83,7 @@ jobs:
           path: |
             src/pages
             src/data/docs.json
+            src/data/lastmod.json
           if-no-files-found: error
           retention-days: 1
   # Straight to main: the pages are a copy of what is already reviewed and
@@ -109,12 +111,12 @@ jobs:
           EXPECTED: ${{ needs.sync.outputs.snapshot }}
         run: |
           [[ "$EXPECTED" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::No snapshot hash from sync"; exit 1; }
-          extra=$(find . -type f ! -path './pages/*' ! -path './data/docs.json')
+          extra=$(find . -type f ! -path './pages/*' ! -path './data/docs.json' ! -path './data/lastmod.json')
           if [ -n "$extra" ]; then
             echo "::error::The artifact holds files outside the snapshot: $extra"
             exit 1
           fi
-          actual=$(find pages data/docs.json -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+          actual=$(find pages data/docs.json data/lastmod.json -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
           if [ "$actual" != "$EXPECTED" ]; then
             echo "::error::The snapshot ($actual) is not the one sync compared ($EXPECTED)"
             exit 1
@@ -123,11 +125,12 @@ jobs:
         env:
           SNAPSHOT: ${{ runner.temp }}/docs-snapshot
         run: |
-          rm -rf src/pages src/data/docs.json
+          rm -rf src/pages src/data/docs.json src/data/lastmod.json
           mkdir -p src/data
           cp -R -- "$SNAPSHOT/pages" src/pages
           cp -- "$SNAPSHOT/data/docs.json" src/data/docs.json
-          git add -A -- src/pages src/data/docs.json
+          cp -- "$SNAPSHOT/data/lastmod.json" src/data/lastmod.json
+          git add -A -- src/pages src/data/docs.json src/data/lastmod.json
           git -c user.name='github-actions[bot]' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
               commit -m 'docs: sync from jerboa engine'

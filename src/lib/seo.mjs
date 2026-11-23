@@ -12,14 +12,15 @@ export const organization = {
   '@id': 'https://jerboa.dev/#organization',
   name: 'jerboa',
   url: 'https://jerboa.dev/',
+  logo: { '@type': 'ImageObject', url: 'https://jerboa.dev/jerboa.webp', width: 618, height: 618 },
   sameAs: 'https://github.com/AitorConS/jerboa',
 };
 
 export const ogImage = {
   src: '/og.png',
   alt: 'jerboa — Less to run. Less to attack.',
-  width: 2400,
-  height: 1260,
+  width: 1200,
+  height: 630,
 };
 
 /** Descriptive document titles. The layout appends " — jerboa docs". */

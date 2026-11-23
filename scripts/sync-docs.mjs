@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { readFile, writeFile, readdir, mkdir, unlink, access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -30,46 +29,16 @@ function warnMissingAlt(file, body) {
   }
 }
 
-function gitShallow(cwd) {
-  try {
-    return execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim() === 'true';
-  } catch {
-    return true;
-  }
-}
-
-// Per-file dates need real history. A depth-1 checkout reports the tip commit
-// for every file, which would flatten lastmod. Keep the committed dates then.
-async function refreshLastmod(pages) {
-  if (gitShallow(source)) return;
-  let previous = {};
-  try {
-    previous = JSON.parse(await readFile(lastmodPath, 'utf8'));
-  } catch {
-    previous = {};
-  }
+// lastmod is the day a page's published text last changed, recorded here
+// when the sync writes it. Git history cannot give it: the docs-sync workflow
+// checks the engine out at depth 1, so every file would carry the tip commit.
+async function updateLastmod(changedSlugs, slugs) {
+  const previous = JSON.parse(await readFile(lastmodPath, 'utf8').catch(() => '{}'));
+  const today = new Date().toISOString().slice(0, 10);
   const next = {};
-  for (const page of pages) {
-    let date = null;
-    try {
-      const out = execFileSync('git', ['log', '-1', '--format=%cI', '--', `docs/${page.slug}.md`], {
-        cwd: source,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim();
-      if (out) date = out.slice(0, 10);
-    } catch {
-      date = null;
-    }
-    next[page.slug] = date || previous[page.slug];
-  }
+  for (const slug of [...slugs].sort()) next[slug] = changedSlugs.has(slug) || !previous[slug] ? today : previous[slug];
   const content = `${JSON.stringify(next, null, 2)}\n`;
-  const prior = await readFile(lastmodPath, 'utf8').catch(() => null);
-  if (prior !== content) await writeFile(lastmodPath, content);
+  if (JSON.stringify(previous, null, 2) + '\n' !== content) await writeFile(lastmodPath, content);
 }
 
 try {
@@ -146,6 +115,7 @@ for (const file of await readdir(destination)) {
   if (!outputs.has(target) && file.endsWith('.md') && (await readFile(target, 'utf8')).includes(marker)) stale.push(target);
 }
 let differences = stale.length;
+const changedSlugs = new Set();
 for (const [target, content] of outputs) {
   const previous = await readFile(target, 'utf8').catch(error => {
     if (error.code === 'ENOENT') return null;
@@ -155,11 +125,12 @@ for (const [target, content] of outputs) {
   differences++;
   if (check) console.error(`Out of sync: ${path.relative(root, target)}`);
   else await writeFile(target, content);
+  if (path.dirname(target) === destination) changedSlugs.add(path.basename(target, '.md'));
 }
 for (const target of stale) {
   if (check) console.error(`Obsolete: ${path.relative(root, target)}`);
   else await unlink(target);
 }
-if (!check) await refreshLastmod(pages);
+if (!check) await updateLastmod(changedSlugs, pages.map(page => page.slug));
 if (check && differences) process.exitCode = 1;
 console.log(`${pages.length} documentation pages ${check ? 'checked' : 'synchronized'} (CLI ${versions.cli}, kernel ${versions.kernel}); ${differences} ${check ? 'differences' : 'updates'}.`);
