@@ -316,11 +316,17 @@ jerboa dns list --network app
 
 Joining a network assigns the VM a guest IP automatically: the daemon's IPAM
 hands out the next free address from the network's subnet. Pass `--ip` only
-when you need a fixed address:
+when you need a fixed address. Set the subnet yourself, then choose an address
+inside it:
 
 ```bash
-jerboa run myapp:latest --network app --ip 10.100.0.10 -p 8080:80
+jerboa network create pinned --subnet 192.168.77.0/24
+jerboa run myapp:latest --network pinned --ip 192.168.77.10 -p 8080:80
 ```
+
+On Linux, `network create` refuses a subnet that overlaps an address or route
+the host already has. If your LAN uses `192.168.77.0/24`, pick another private
+`/24`.
 
 Important (Linux and Windows):
 
@@ -424,7 +430,7 @@ MAC and IP address there, and VMs start even when the rules cannot be loaded
 `jerboa` WSL2 distro. With WSL2's default NAT networking the port is **not**
 reachable at `localhost:<port>` on the Windows host — reach it at the distro IP
 instead (the host shown by `jerboa daemon status`, e.g.
-`http://172.25.x.x:8080`). To make `localhost` work like Docker Desktop, enable
+`http://<distro-ip>:8080`). To make `localhost` work like Docker Desktop, enable
 mirrored networking by adding the following to `%USERPROFILE%\.wslconfig` and
 running `wsl --shutdown`:
 
@@ -578,9 +584,10 @@ snapshots, registry credentials and settings. Back up what you need first.
   curl -fsSL https://jerboa.dev/install.sh | sudo bash -s -- --uninstall
   ```
 
-  It stops and removes the `jerboad` service, the binaries, the `jerboa` system
-  user, `/var/lib/jerboa`, `/etc/jerboa` and your `~/.jerboa`. Add `--keep-data`
-  to remove only the programs and the service. Packages the installer added
+  It stops and removes the `jerboad` service, its `jerboa_guard` nftables
+  tables, the binaries, the `jerboa` system user, `/var/lib/jerboa`,
+  `/etc/jerboa` and your `~/.jerboa`. Add `--keep-data` to remove only the
+  programs, the service and the guard tables. Packages the installer added
   with `apt` (QEMU, iptables, nftables…) are left in place.
 
 ---
