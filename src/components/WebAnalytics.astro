@@ -1,0 +1,21 @@
+---
+// Cloudflare Web Analytics. DNS is not proxied, so the beacon is not injected
+// at the edge. A module script is deferred (it does not block rendering) and
+// the browser will not run the same module again after a ClientRouter
+// navigation; the beacon records those navigations itself. No token: no script.
+const token = import.meta.env.PUBLIC_CF_WEB_ANALYTICS_TOKEN?.trim() ?? '';
+const beacon = token ? JSON.stringify({ token }) : '';
+---
+
+{
+  beacon && (
+    <script
+      is:inline
+      type="module"
+      defer
+      fetchpriority="low"
+      src="https://static.cloudflareinsights.com/beacon.min.js"
+      data-cf-beacon={beacon}
+    />
+  )
+}

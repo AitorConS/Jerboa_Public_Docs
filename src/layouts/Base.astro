@@ -23,6 +23,7 @@ import '../styles/fonts.css';
 import '../styles/global.css';
 import { organization } from '../lib/seo.mjs';
 import { ClientRouter } from 'astro:transitions';
+import WebAnalytics from '../components/WebAnalytics.astro';
 
 // Absolute URLs for canonical + social cards (Astro.site is https://docs.jerboa.dev).
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
@@ -97,5 +98,6 @@ const jsonLd = {
     <script>
       import '../scripts/dither.js';
     </script>
+    <WebAnalytics />
   </body>
 </html>

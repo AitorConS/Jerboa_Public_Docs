@@ -39,16 +39,37 @@ engine's `index.md` is skipped by the sync.)
 A standalone checkout builds using the committed snapshot when `../jerboa`
 is absent.
 
+## Analytics
+
+Cloudflare Web Analytics is included only when `PUBLIC_CF_WEB_ANALYTICS_TOKEN`
+is set at build time. The value is the site token from the Cloudflare
+dashboard: Web Analytics → `docs.jerboa.dev` → Manage site. Set it on the
+Vercel project (Production), then redeploy. The token is public and is written
+into each page. Leave it unset to build with no beacon; the build still
+succeeds.
+
+The site is DNS-only, so Cloudflare does not inject the script. `Base.astro`
+renders `https://static.cloudflareinsights.com/beacon.min.js` from
+`src/components/WebAnalytics.astro` as a deferred module (`type="module"`,
+`defer`, `fetchpriority="low"`). Titles, meta tags, canonical URLs, the
+sitemap and redirects are unchanged.
+
+There is no Content-Security-Policy. A policy added later must allow
+`https://static.cloudflareinsights.com` in `script-src` and
+`https://cloudflareinsights.com` in `connect-src`. The manual beacon sends
+metrics to `https://cloudflareinsights.com/cdn-cgi/rum`.
+
 ## Structure
 
 ```
 src/
-  layouts/Base.astro       — html shell, fonts, global CSS
+  layouts/Base.astro       — html shell, fonts, global CSS, analytics beacon
   layouts/Docs.astro       — documentation navigation, contents and typography
   components/
     Nav.astro              — header linking back to jerboa.dev
     Footer.astro           — site footer
     CodeBlock.astro        — terminal-style copyable code block
+    WebAnalytics.astro     — Cloudflare Web Analytics beacon
   pages/
     index.astro            — redirect to /getting-started/
     *.md                   — generated documentation pages
