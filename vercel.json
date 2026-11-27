@@ -4,26 +4,10 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm run build",
   "outputDirectory": "dist",
-  "trailingSlash": true,
   "redirects": [
     {
       "source": "/",
       "destination": "/getting-started/",
-      "permanent": true
-    },
-    {
-      "source": "/macos-firecracker/",
-      "destination": "/macos-spark/",
-      "permanent": true
-    },
-    {
-      "source": "/docs",
-      "destination": "https://docs.jerboa.dev/",
-      "permanent": true
-    },
-    {
-      "source": "/docs/:path*",
-      "destination": "https://docs.jerboa.dev/:path*",
       "permanent": true
     },
     {
@@ -32,8 +16,68 @@
       "permanent": true
     },
     {
-      "source": "/:page.html",
-      "destination": "https://docs.jerboa.dev/:page/",
+      "source": "/docs",
+      "destination": "/getting-started/",
+      "permanent": true
+    },
+    {
+      "source": "/docs/",
+      "destination": "/getting-started/",
+      "permanent": true
+    },
+    {
+      "source": "/docs/index.html",
+      "destination": "/getting-started/",
+      "permanent": true
+    },
+    {
+      "source": "/macos-firecracker",
+      "destination": "/macos-spark/",
+      "permanent": true
+    },
+    {
+      "source": "/macos-firecracker/",
+      "destination": "/macos-spark/",
+      "permanent": true
+    },
+    {
+      "source": "/macos-firecracker.html",
+      "destination": "/macos-spark/",
+      "permanent": true
+    },
+    {
+      "source": "/docs/macos-firecracker",
+      "destination": "/macos-spark/",
+      "permanent": true
+    },
+    {
+      "source": "/docs/macos-firecracker/",
+      "destination": "/macos-spark/",
+      "permanent": true
+    },
+    {
+      "source": "/docs/macos-firecracker.html",
+      "destination": "/macos-spark/",
+      "permanent": true
+    },
+    {
+      "source": "/:slug(macos-distribution|registry-protocol|getting-started|macos-snapshots|package-recipes|release-process|troubleshooting|build-concepts|macos-shutdown|packages-arm64|postgres-arm64|cli-reference|observability|architecture|macos-guide|macos-spark|macos-stats|benchmarks|changelog|registry|compose|macos)",
+      "destination": "/:slug/",
+      "permanent": true
+    },
+    {
+      "source": "/:slug(macos-distribution|registry-protocol|getting-started|macos-snapshots|package-recipes|release-process|troubleshooting|build-concepts|macos-shutdown|packages-arm64|postgres-arm64|cli-reference|observability|architecture|macos-guide|macos-spark|macos-stats|benchmarks|changelog|registry|compose|macos).html",
+      "destination": "/:slug/",
+      "permanent": true
+    },
+    {
+      "source": "/docs/:slug(macos-distribution|registry-protocol|getting-started|macos-snapshots|package-recipes|release-process|troubleshooting|build-concepts|macos-shutdown|packages-arm64|postgres-arm64|cli-reference|observability|architecture|macos-guide|macos-spark|macos-stats|benchmarks|changelog|registry|compose|macos)",
+      "destination": "/:slug/",
+      "permanent": true
+    },
+    {
+      "source": "/docs/:slug(macos-distribution|registry-protocol|getting-started|macos-snapshots|package-recipes|release-process|troubleshooting|build-concepts|macos-shutdown|packages-arm64|postgres-arm64|cli-reference|observability|architecture|macos-guide|macos-spark|macos-stats|benchmarks|changelog|registry|compose|macos)/",
+      "destination": "/:slug/",
       "permanent": true
     }
   ],

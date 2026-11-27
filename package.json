@@ -6,7 +6,7 @@
   "packageManager": "pnpm@11.25.0",
   "scripts": {
     "dev": "node scripts/sync-docs.mjs --if-present && astro dev",
-    "build": "node scripts/sync-docs.mjs --if-present && astro build",
+    "build": "node scripts/sync-docs.mjs --if-present && node scripts/check-indexing.mjs && astro build",
     "docs:sync": "node scripts/sync-docs.mjs",
     "docs:check": "node scripts/sync-docs.mjs --check",
     "docs:anchors": "node scripts/check-anchors.mjs",

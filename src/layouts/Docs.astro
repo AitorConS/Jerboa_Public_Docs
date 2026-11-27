@@ -3,7 +3,7 @@ import Base from './Base.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import docs from '../data/docs.json';
-import { articleImages, breadcrumbItems, organization, seoTitleFor } from '../lib/seo.mjs';
+import { articleImages, breadcrumbItems, organization, seoDescriptionFor, seoTitleFor } from '../lib/seo.mjs';
 import type { MarkdownLayoutProps } from 'astro';
 type Props = MarkdownLayoutProps<{ title: string; description?: string; seoTitle?: string; source: string }>;
 const { frontmatter, rawContent } = Astro.props;
@@ -38,8 +38,11 @@ function describe(markdown: string): string {
   if (text.length <= 160) return text;
   return `${text.slice(0, 155).replace(/\s+\S*$/, '').replace(/[,;:]$/, '')}…`;
 }
-// A description written in jerboa/docs wins; otherwise derive one.
-const description = frontmatter.description ?? describe(rawContent());
+// A snippet in seo.mjs wins, so a docs sync cannot put a competing description
+// back. Otherwise the jerboa/docs frontmatter description wins, and a page
+// with neither gets one derived above.
+const slug = (frontmatter.source ?? '').replace(/\.md$/, '');
+const description = seoDescriptionFor(slug, frontmatter.description) ?? describe(rawContent());
 const markdown = import.meta.glob('../pages/*.md', { eager: true });
 const groups = [
   { title: 'Start', slugs: ['getting-started', 'build-concepts'] },
@@ -54,7 +57,6 @@ const groups = [
 const current = groups.flatMap(group => group.pages).find(page => `${page.slug}.md` === frontmatter.source);
 const group = groups.find(g => g.pages.some(page => `${page.slug}.md` === frontmatter.source));
 const pageUrl = new URL(Astro.url.pathname, Astro.site).href;
-const slug = (frontmatter.source ?? '').replace(/\.md$/, '');
 const pageTitle = seoTitleFor(slug, frontmatter.title, frontmatter.seoTitle);
 const docsHome = new URL('/getting-started/', Astro.site).href;
 // The pages in sidebar order, for the previous and next links under the article.

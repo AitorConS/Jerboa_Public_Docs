@@ -19,9 +19,10 @@ permissions:
 # - publish installs and runs nothing from the repository: it checks the
 #   uploaded snapshot against the hash recorded before the install (so a
 #   snapshot changed later in sync, by the build or anything it installed,
-#   is refused), puts it in place of src/pages, src/data/docs.json and
-#   src/data/lastmod.json on the
-#   same commit and pushes to main.
+#   is refused), puts it in place of src/pages, src/data/docs.json,
+#   src/data/lastmod.json and the redirects in vercel.json on the same
+#   commit and pushes to main. Only the redirects of vercel.json may change:
+#   they list the page slugs, and the rest of that file is checked unchanged.
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -50,19 +51,20 @@ jobs:
           node-version: 22
       # The sync script uses only Node's standard library, so the comparison
       # needs no install. The snapshot's hash covers every file under
-      # src/pages and src/data/docs.json, with their paths.
+      # src/pages, src/data/docs.json, src/data/lastmod.json and vercel.json,
+      # with their paths.
       - name: Compare with the engine's docs
         id: diff
         run: |
           JERBOA_SOURCE=engine node scripts/sync-docs.mjs
-          git add -A -- src/pages src/data/docs.json src/data/lastmod.json
+          git add -A -- src/pages src/data/docs.json src/data/lastmod.json vercel.json
           if git diff --cached --quiet; then
             echo "The site already matches the engine's docs."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git diff --cached --stat
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            snapshot=$(cd src && find pages data/docs.json data/lastmod.json -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+            snapshot=$(find src/pages src/data/docs.json src/data/lastmod.json vercel.json -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
             echo "Snapshot: $snapshot"
             echo "snapshot=$snapshot" >> "$GITHUB_OUTPUT"
           fi
@@ -84,6 +86,7 @@ jobs:
             src/pages
             src/data/docs.json
             src/data/lastmod.json
+            vercel.json
           if-no-files-found: error
           retention-days: 1
   # Straight to main: the pages are a copy of what is already reviewed and
@@ -104,19 +107,19 @@ jobs:
         with:
           name: docs-snapshot
           path: ${{ runner.temp }}/docs-snapshot
-      # The artifact keeps the paths below src/: pages/ and data/docs.json.
+      # The artifact keeps the repository paths: src/pages, src/data/*.json and vercel.json.
       - name: Check the snapshot against the recorded hash
         working-directory: ${{ runner.temp }}/docs-snapshot
         env:
           EXPECTED: ${{ needs.sync.outputs.snapshot }}
         run: |
           [[ "$EXPECTED" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::No snapshot hash from sync"; exit 1; }
-          extra=$(find . -type f ! -path './pages/*' ! -path './data/docs.json' ! -path './data/lastmod.json')
+          extra=$(find . -type f ! -path './src/pages/*' ! -path './src/data/docs.json' ! -path './src/data/lastmod.json' ! -path './vercel.json')
           if [ -n "$extra" ]; then
             echo "::error::The artifact holds files outside the snapshot: $extra"
             exit 1
           fi
-          actual=$(find pages data/docs.json data/lastmod.json -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+          actual=$(find src/pages src/data/docs.json src/data/lastmod.json vercel.json -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
           if [ "$actual" != "$EXPECTED" ]; then
             echo "::error::The snapshot ($actual) is not the one sync compared ($EXPECTED)"
             exit 1
@@ -125,12 +128,19 @@ jobs:
         env:
           SNAPSHOT: ${{ runner.temp }}/docs-snapshot
         run: |
+          # Sync may only rewrite the redirects: the build and install
+          # commands in vercel.json must stay what main has.
+          if [ "$(jq -S 'del(.redirects)' "$SNAPSHOT/vercel.json")" != "$(jq -S 'del(.redirects)' vercel.json)" ]; then
+            echo "::error::The snapshot's vercel.json changes more than its redirects"
+            exit 1
+          fi
           rm -rf src/pages src/data/docs.json src/data/lastmod.json
           mkdir -p src/data
-          cp -R -- "$SNAPSHOT/pages" src/pages
-          cp -- "$SNAPSHOT/data/docs.json" src/data/docs.json
-          cp -- "$SNAPSHOT/data/lastmod.json" src/data/lastmod.json
-          git add -A -- src/pages src/data/docs.json src/data/lastmod.json
+          cp -R -- "$SNAPSHOT/src/pages" src/pages
+          cp -- "$SNAPSHOT/src/data/docs.json" src/data/docs.json
+          cp -- "$SNAPSHOT/src/data/lastmod.json" src/data/lastmod.json
+          cp -- "$SNAPSHOT/vercel.json" vercel.json
+          git add -A -- src/pages src/data/docs.json src/data/lastmod.json vercel.json
           git -c user.name='github-actions[bot]' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
               commit -m 'docs: sync from jerboa engine'

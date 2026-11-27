@@ -37,7 +37,8 @@ const jsonLd = {
       '@type': 'WebSite',
       '@id': new URL('/#website', Astro.site).href,
       name: 'jerboa documentation',
-      url: Astro.site?.href,
+      // `/` only redirects. The site URL is the docs home, which answers 200.
+      url: new URL('/getting-started/', Astro.site).href,
       inLanguage: 'en',
       publisher: { '@id': organization['@id'] },
     },

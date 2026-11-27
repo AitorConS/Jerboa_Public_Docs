@@ -1,6 +1,7 @@
 import { readFile, writeFile, readdir, mkdir, unlink, access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { withDocsRedirects } from './redirects.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const source = path.resolve(process.env.JERBOA_SOURCE || path.join(root, '../jerboa'));
@@ -108,6 +109,9 @@ for (const file of files) {
 }
 pages.sort((a, b) => a.order - b.order);
 outputs.set(path.join(root, 'src/data/docs.json'), JSON.stringify({ versions, pages }, null, 2) + '\n');
+// Redirects list the page slugs, so they change with the pages.
+const vercelPath = path.join(root, 'vercel.json');
+outputs.set(vercelPath, withDocsRedirects(await readFile(vercelPath, 'utf8'), pages.map(page => page.slug)));
 await mkdir(destination, { recursive: true });
 const stale = [];
 for (const file of await readdir(destination)) {
