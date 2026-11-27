@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { seoDescriptionFor, seoTitleFor } from '../src/lib/seo.mjs';
+import { docsRedirects, legacyRedirects, pageRedirectShapes } from './redirects.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const failures = [];
@@ -25,19 +26,12 @@ if ('trailingSlash' in vercel) {
   fail('Omit trailingSlash. true redirects every missing path to a slash URL (308) before a 404 can be returned.');
 }
 
-const legacy = new Map([
-  ['/', '/getting-started/'],
-  ['/index.html', '/getting-started/'],
-  ['/docs', '/getting-started/'],
-  ['/docs/', '/getting-started/'],
-  ['/docs/index.html', '/getting-started/'],
-  ['/macos-firecracker', '/macos-spark/'],
-  ['/macos-firecracker/', '/macos-spark/'],
-  ['/macos-firecracker.html', '/macos-spark/'],
-  ['/docs/macos-firecracker', '/macos-spark/'],
-  ['/docs/macos-firecracker/', '/macos-spark/'],
-  ['/docs/macos-firecracker.html', '/macos-spark/'],
-]);
+// vercel.json's redirects are generated from the slugs by docs:sync.
+if (JSON.stringify(vercel.redirects) !== JSON.stringify(docsRedirects(slugs))) {
+  fail('vercel.json redirects do not match the docs pages. Run `pnpm run docs:sync` and commit vercel.json.');
+}
+
+const legacy = new Map(legacyRedirects);
 
 function escapeReg(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -95,7 +89,7 @@ for (const source of legacy.keys()) {
 }
 
 const parametricSources = rules.filter((rule) => rule.source.includes(':slug(')).map((rule) => rule.source.replace(/:slug\([^)]+\)/, ':slug'));
-const expectedShapes = ['/:slug', '/:slug.html', '/docs/:slug', '/docs/:slug/'];
+const expectedShapes = pageRedirectShapes;
 for (const shape of expectedShapes) {
   if (!parametricSources.includes(shape)) fail(`Missing redirect shape ${shape}`);
 }
